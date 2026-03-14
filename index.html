@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Condomínio Desk — Painel</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; }
+
+    /* LOGIN */
+    #login-screen {
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; background: #1a237e;
+    }
+    .login-card {
+      background: white; border-radius: 16px; padding: 48px 40px;
+      width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .login-card h1 { font-size: 24px; color: #1a237e; margin-bottom: 8px; }
+    .login-card p { color: #666; margin-bottom: 32px; font-size: 14px; }
+    .login-card input {
+      width: 100%; padding: 14px 16px; border: 1.5px solid #e0e0e0;
+      border-radius: 10px; font-size: 15px; margin-bottom: 16px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .login-card input:focus { border-color: #1a237e; }
+    .btn-primary {
+      width: 100%; padding: 14px; background: #1a237e; color: white;
+      border: none; border-radius: 10px; font-size: 16px; font-weight: 600;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #283593; }
+    .erro { color: #e53935; font-size: 13px; margin-top: 8px; text-align: center; }
+
+    /* DASHBOARD */
+    #dashboard { display: none; }
+    .topbar {
+      background: #1a237e; color: white; padding: 16px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .topbar h1 { font-size: 20px; display: flex; align-items: center; gap: 10px; }
+    .topbar-right { display: flex; align-items: center; gap: 16px; }
+    .atualizado { font-size: 12px; color: rgba(255,255,255,0.6); }
+    .btn-logout {
+      padding: 8px 16px; background: rgba(255,255,255,0.15); color: white;
+      border: 1px solid rgba(255,255,255,0.3); border-radius: 8px;
+      cursor: pointer; font-size: 13px; transition: background 0.2s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.25); }
+
+    .tabs {
+      display: flex; background: white; border-bottom: 2px solid #e0e0e0;
+      padding: 0 32px;
+    }
+    .tab {
+      padding: 16px 24px; cursor: pointer; font-weight: 600; color: #666;
+      border-bottom: 3px solid transparent; margin-bottom: -2px;
+      transition: all 0.2s; display: flex; align-items: center; gap: 8px;
+    }
+    .tab.active { color: #1a237e; border-bottom-color: #1a237e; }
+    .tab:hover { color: #1a237e; }
+
+    .content { padding: 24px 32px; max-width: 1200px; margin: 0 auto; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* CARDS */
+    .section-title {
+      font-size: 18px; font-weight: 700; color: #1a237e;
+      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+    .badge {
+      background: #1a237e; color: white; border-radius: 12px;
+      padding: 2px 10px; font-size: 13px;
+    }
+    .badge.orange { background: #f57c00; }
+    .badge.green { background: #2e7d32; }
+
+    .card {
+      background: white; border-radius: 12px; padding: 20px;
+      margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      border-left: 4px solid #1a237e; cursor: pointer;
+      transition: box-shadow 0.2s, transform 0.1s;
+    }
+    .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); transform: translateY(-1px); }
+    .card.pendente { border-left-color: #f57c00; }
+    .card.retirada { border-left-color: #2e7d32; }
+    .card.reserva-hoje { border-left-color: #1a237e; background: #f3f4ff; }
+
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .card-title { font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+    .card-sub { color: #666; font-size: 13px; margin-bottom: 4px; }
+    .chip {
+      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    }
+    .chip.pendente { background: #fff3e0; color: #f57c00; }
+    .chip.retirada { background: #e8f5e9; color: #2e7d32; }
+    .chip.hoje { background: #e8eaf6; color: #1a237e; }
+
+    .data-header {
+      background: #e8eaf6; color: #1a237e; font-weight: 700; font-size: 13px;
+      padding: 8px 16px; border-radius: 20px; margin: 16px 0 8px;
+      display: inline-block;
+    }
+    .data-header.hoje { background: #1a237e; color: white; }
+
+    .foto-thumb {
+      width: 80px; height: 60px; object-fit: cover; border-radius: 8px;
+      cursor: pointer; border: 2px solid #e0e0e0;
+    }
+
+    /* MODAL FOTO */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+      z-index: 1000; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-overlay img {
+      max-width: 90vw; max-height: 90vh; border-radius: 8px;
+    }
+    .modal-close {
+      position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.5);
+      color: white; border: none; border-radius: 50%; width: 40px; height: 40px;
+      font-size: 20px; cursor: pointer; display: flex; align-items: center;
+      justify-content: center;
+    }
+
+    .empty {
+      text-align: center; padding: 48px; color: #999;
+    }
+    .empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+    .loading { text-align: center; padding: 48px; color: #666; }
+    .spinner {
+      width: 40px; height: 40px; border: 4px solid #e0e0e0;
+      border-top-color: #1a237e; border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .info-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 8px; margin-top: 8px;
+    }
+    .info-item { display: flex; gap: 8px; align-items: flex-start; }
+    .info-label { color: #999; font-size: 12px; }
+    .info-value { font-weight: 600; font-size: 14px; }
+
+    @media (max-width: 600px) {
+      .content { padding: 16px; }
+      .tabs { padding: 0 16px; }
+      .topbar { padding: 12px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>🏢 Condomínio Desk</h1>
+    <p>Painel de visualização — acesso administrativo</p>
+    <input type="email" id="email" placeholder="Email" value="portaria@condominioDesk.com">
+    <input type="password" id="senha" placeholder="Senha">
+    <button class="btn-primary" onclick="login()">Entrar</button>
+    <p class="erro" id="erro-login"></p>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="topbar">
+    <h1>🏢 Condomínio Desk</h1>
+    <div class="topbar-right">
+      <span class="atualizado" id="atualizado-em"></span>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="mudarTab('encomendas')">
+      📦 Encomendas
+    </div>
+    <div class="tab" onclick="mudarTab('reservas')">
+      🗓️ Reservas
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="tab-encomendas" class="tab-content active">
+      <div id="encomendas-content" class="loading">
+        <div class="spinner"></div>
+        Carregando encomendas...
+      </div>
+    </div>
+    <div id="tab-reservas" class="tab-content">
+      <div id="reservas-content" class="loading">
+        <div class="spinner"></div>
+        Carregando reservas...
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL FOTO -->
+<div class="modal-overlay" id="modal-foto" onclick="fecharFoto()">
+  <button class="modal-close" onclick="fecharFoto()">✕</button>
+  <img id="modal-img" src="" alt="Foto da encomenda">
+</div>
+
+<script>
+const SUPABASE_URL = 'https://aatpmxexgrtknnafjhqu.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhdHBteGV4Z3J0a25uYWZqaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNDkyNzIsImV4cCI6MjA4ODkyNTI3Mn0.ugx_4mE_ZSz7FE0rwOvsw5R4Psg27hefsG0TTIEYDbc';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let intervalo = null;
+let tabAtual = 'encomendas';
+let espacosCache = [];
+
+async function login() {
+  const email = document.getElementById('email').value;
+  const senha = document.getElementById('senha').value;
+  document.getElementById('erro-login').textContent = '';
+  try {
+    const { error } = await db.auth.signInWithPassword({ email, password: senha });
+    if (error) throw error;
+    mostrarDashboard();
+  } catch (e) {
+    document.getElementById('erro-login').textContent = 'Email ou senha incorretos.';
+  }
+}
+
+async function logout() {
+  await db.auth.signOut();
+  clearInterval(intervalo);
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function mostrarDashboard() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  carregarEspacos().then(() => {
+    carregarTudo();
+    intervalo = setInterval(carregarTudo, 30000);
+  });
+}
+
+async function carregarEspacos() {
+  const { data } = await db.from('espacos_comuns').select();
+  espacosCache = data || [];
+}
+
+function nomesEspacos(ids) {
+  return ids.map(id => {
+    const e = espacosCache.find(e => e.id === id);
+    return e ? e.nome : id;
+  }).join(' + ');
+}
+
+async function carregarTudo() {
+  await Promise.all([carregarEncomendas(), carregarReservas()]);
+  const agora = new Date().toLocaleTimeString('pt-BR');
+  document.getElementById('atualizado-em').textContent = `Atualizado às ${agora}`;
+}
+
+async function carregarEncomendas() {
+  const { data: encomendas } = await db
+    .from('encomendas')
+    .select('*, salas(numero, nome_empresa)')
+    .eq('status', 'pendente')
+    .order('criado_em', { ascending: false });
+
+  const el = document.getElementById('encomendas-content');
+
+  if (!encomendas || encomendas.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="icon">📭</div>Nenhuma encomenda pendente</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="section-title">
+      📦 Encomendas Pendentes
+      <span class="badge orange">${encomendas.length}</span>
+    </div>
+    ${encomendas.map(e => `
+      <div class="card pendente">
+        <div class="card-header">
+          <div>
+            <div class="card-title">${e.nome_destinatario}</div>
+            <div class="card-sub">🏢 Sala ${e.salas?.numero || ''} — ${e.salas?.nome_empresa || 'Sem nome'}</div>
+            ${e.codigo_rastreio ? `<div class="card-sub">📦 ${e.codigo_rastreio}</div>` : ''}
+            <div class="card-sub">⏰ ${new Date(e.criado_em).toLocaleString('pt-BR')}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+            <span class="chip pendente">Pendente</span>
+            ${e.foto_url ? `<img class="foto-thumb" src="${e.foto_url}" onclick="abrirFoto('${e.foto_url}', event)">` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+async function carregarReservas() {
+  const hoje = new Date().toISOString().split('T')[0];
+  const { data: reservas } = await db
+    .from('reservas')
+    .select()
+    .gte('data', hoje)
+    .order('data')
+    .order('hora_inicio');
+
+  const el = document.getElementById('reservas-content');
+
+  if (!reservas || reservas.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="icon">📅</div>Nenhuma reserva próxima</div>';
+    return;
+  }
+
+  const porData = {};
+  for (const r of reservas) {
+    porData[r.data] = porData[r.data] || [];
+    porData[r.data].push(r);
+  }
+
+  const isHoje = d => d === hoje;
+
+  el.innerHTML = `
+    <div class="section-title">
+      🗓️ Próximas Reservas
+      <span class="badge">${reservas.length}</span>
+    </div>
+    ${Object.entries(porData).map(([data, lista]) => `
+      <div class="data-header ${isHoje(data) ? 'hoje' : ''}">
+        ${isHoje(data) ? 'Hoje — ' : ''}${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+      </div>
+      ${lista.map(r => `
+        <div class="card ${isHoje(data) ? 'reserva-hoje' : ''}">
+          <div class="card-header">
+            <div>
+              <div class="card-title">${nomesEspacos(r.espaco_ids)}</div>
+              <div class="card-sub">🕐 ${r.hora_inicio.substring(0,5)} — ${r.hora_fim.substring(0,5)}</div>
+              <div class="card-sub">👤 ${r.responsavel_nome}</div>
+            </div>
+            ${isHoje(data) ? '<span class="chip hoje">Hoje</span>' : ''}
+          </div>
+          <div class="info-grid" style="margin-top:12px">
+            ${r.num_pessoas ? `<div class="info-item"><span>👥</span><div><div class="info-label">Pessoas</div><div class="info-value">${r.num_pessoas}</div></div></div>` : ''}
+            ${r.valor_total ? `<div class="info-item"><span>💰</span><div><div class="info-label">Valor</div><div class="info-value">R$ ${parseFloat(r.valor_total).toFixed(2)}</div></div></div>` : ''}
+            ${r.duracao_tipo ? `<div class="info-item"><span>⏱️</span><div><div class="info-label">Duração</div><div class="info-value">${r.duracao_valor} ${r.duracao_tipo}</div></div></div>` : ''}
+            ${r.observacoes ? `<div class="info-item"><span>📝</span><div><div class="info-label">Obs</div><div class="info-value">${r.observacoes}</div></div></div>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    `).join('')}
+  `;
+}
+
+function mudarTab(tab) {
+  tabAtual = tab;
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && tab === 'encomendas') || (i === 1 && tab === 'reservas'));
+  });
+  document.getElementById('tab-encomendas').classList.toggle('active', tab === 'encomendas');
+  document.getElementById('tab-reservas').classList.toggle('active', tab === 'reservas');
+}
+
+function abrirFoto(url, e) {
+  e.stopPropagation();
+  document.getElementById('modal-img').src = url;
+  document.getElementById('modal-foto').classList.add('open');
+}
+
+function fecharFoto() {
+  document.getElementById('modal-foto').classList.remove('open');
+}
+
+document.getElementById('senha').addEventListener('keydown', e => {
+  if (e.key === 'Enter') login();
+});
+
+// Verifica sessão existente
+db.auth.getSession().then(({ data }) => {
+  if (data.session) mostrarDashboard();
+});
+</script>
+</body>
+</html>
