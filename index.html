@@ -205,8 +205,8 @@ async function carregarEspacos() {
 }
 
 async function carregarSalasSelect() {
-  const { data } = await db.from('salas').select('numero, nome_empresa').order('numero');
-  salasCache = data || [];
+  const { data } = await db.from('salas').select('numero, nome_empresa').order('numero', { ascending: true });
+salasCache = (data || []).sort((a, b) => parseInt(a.numero) - parseInt(b.numero));
   const sel = document.getElementById('rel-sala-numero');
   salasCache.forEach(s => {
     const opt = document.createElement('option');
