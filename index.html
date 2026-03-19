@@ -268,7 +268,7 @@ async function carregarReservas() {
       ${r.num_pessoas?`<div class="info-item"><span>👥</span><div><div class="info-label">Pessoas</div><div class="info-value">${r.num_pessoas}</div></div></div>`:''}
       ${r.valor_total?`<div class="info-item"><span>💰</span><div><div class="info-label">Valor</div><div class="info-value">R$ ${parseFloat(r.valor_total).toFixed(2)}</div></div></div>`:''}
       ${r.num_cadeiras?`<div class="info-item"><span>🪑</span><div><div class="info-label">Cadeiras</div><div class="info-value">${r.num_cadeiras}</div></div></div>`:''}
-      ${r.num_mesas?`<div class="info-item"><span>🪵</span><div><div class="info-label">Mesas</div><div class="info-value">${r.num_mesas}</div></div></div>`:''}
+      ${r.num_mesas?`<div class="info-item"><span>⬛</span><div><div class="info-label">Mesas</div><div class="info-value">${r.num_mesas}</div></div></div>`:''}
       ${r.observacoes?`<div class="info-item"><span>📝</span><div><div class="info-label">Obs</div><div class="info-value">${r.observacoes}</div></div></div>`:''}
     </div></div>`).join('')}`).join('')}`;
 }
