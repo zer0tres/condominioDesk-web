@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Condomínio Desk — Painel</title>
+  <title>AR3000 — Painel</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
@@ -78,7 +78,7 @@
 
 <div id="login-screen">
   <div class="login-card">
-    <h1>🏢 Condomínio Desk</h1>
+    <h1>🏢 AR3000</h1>
     <p>Painel de visualização — acesso administrativo</p>
     <input type="email" id="email" placeholder="Email" value="portaria@condominioDesk.com">
     <input type="password" id="senha" placeholder="Senha">
@@ -89,7 +89,7 @@
 
 <div id="dashboard">
   <div class="topbar">
-    <h1>🏢 Condomínio Desk</h1>
+    <h1>🏢 AR3000</h1>
     <div class="topbar-right">
       <span class="atualizado" id="atualizado-em"></span>
       <button class="btn-logout" onclick="logout()">Sair</button>
@@ -296,7 +296,7 @@ function criarPDF(titulo, subtitulo) {
   doc.rect(0, 0, 210, 30, 'F');
   doc.setTextColor(255,255,255);
   doc.setFontSize(16); doc.setFont('helvetica','bold');
-  doc.text('Condomínio Desk — Relatório de Uso', 14, 13);
+  doc.text('AR3000 — Relatório de Uso', 14, 13);
   doc.setFontSize(11); doc.setFont('helvetica','normal');
   doc.text(titulo, 14, 21);
   doc.setTextColor(0,0,0);
