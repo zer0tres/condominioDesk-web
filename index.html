@@ -134,6 +134,35 @@
         </div>
       </div>
 
+      <!-- Relatórios de Encomendas -->
+      <div class="relatorio-box">
+        <h3>📦 Encomendas por Mês (Geral)</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Mês/Ano</label>
+            <input type="month" id="rel-enc-mes-data">
+          </div>
+          <button class="btn-pdf" onclick="gerarRelatorioEncomendasMes()">📄 Gerar PDF</button>
+        </div>
+      </div>
+
+      <div class="relatorio-box">
+        <h3>📦 Encomendas por Sala e Mês</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Sala</label>
+            <select id="rel-enc-sala-numero">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Mês/Ano</label>
+            <input type="month" id="rel-enc-sala-mes">
+          </div>
+          <button class="btn-pdf" onclick="gerarRelatorioEncomendasSala()">📄 Gerar PDF</button>
+        </div>
+      </div>
+
       <!-- Relatório por sala -->
       <div class="relatorio-box">
         <h3>🏢 Relatório por Sala (Condômino)</h3>
@@ -213,6 +242,10 @@ salasCache = (data || []).sort((a, b) => parseInt(a.numero) - parseInt(b.numero)
     opt.value = s.numero;
     opt.textContent = `${s.numero}${s.nome_empresa ? ' — ' + s.nome_empresa : ''}`;
     sel.appendChild(opt);
+    // Também adiciona no select de encomendas por sala
+    const opt2 = opt.cloneNode(true);
+    const sel2 = document.getElementById('rel-enc-sala-numero');
+    if (sel2) sel2.appendChild(opt2);
   });
 }
 
