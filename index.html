@@ -478,6 +478,90 @@ async function gerarRelatorioSala() {
   doc.save(`relatorio-sala-${numero}-${dataVal}.pdf`);
 }
 
+
+async function buscarEncomendasPeriodo(inicio, fim, salaId) {
+  let query = db.from('encomendas')
+    .select('*, salas(numero, nome_empresa)')
+    .gte('criado_em', inicio + 'T00:00:00')
+    .lte('criado_em', fim + 'T23:59:59')
+    .order('criado_em');
+  if (salaId) query = query.eq('sala_id', salaId);
+  const { data } = await query;
+  return data || [];
+}
+
+function adicionarTabelaEncomendas(doc, encomendas, yStart) {
+  if (!encomendas.length) {
+    doc.setFontSize(11); doc.setTextColor(150,150,150);
+    doc.text('Nenhuma encomenda encontrada no periodo.', 14, yStart + 10);
+    doc.setTextColor(0,0,0);
+    return yStart + 25;
+  }
+  const rows = encomendas.map(e => [
+    e.salas ? e.salas.numero : '-',
+    e.nome_destinatario || '-',
+    e.codigo_rastreio || '-',
+    e.retirado_por || 'Pendente',
+    e.status === 'retirada' ? 'Retirada' : 'Pendente',
+    new Date(e.criado_em).toLocaleString('pt-BR'),
+    e.retirado_em ? new Date(e.retirado_em).toLocaleString('pt-BR') : '-',
+  ]);
+  doc.autoTable({
+    startY: yStart,
+    head: [['Sala','Destinatario','Codigo','Retirado por','Status','Chegada','Retirada']],
+    body: rows,
+    headStyles: { fillColor: [26,35,126], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+    bodyStyles: { fontSize: 7 },
+    alternateRowStyles: { fillColor: [248,249,255] },
+    columnStyles: {
+      0:{cellWidth:16}, 1:{cellWidth:32}, 2:{cellWidth:28},
+      3:{cellWidth:28}, 4:{cellWidth:18}, 5:{cellWidth:32}, 6:{cellWidth:32}
+    },
+    margin: { left: 14, right: 14 },
+  });
+  return doc.lastAutoTable.finalY;
+}
+
+async function gerarRelatorioEncomendasMes() {
+  const mes = document.getElementById('rel-enc-mes-data').value;
+  if (!mes) { alert('Selecione um mes.'); return; }
+  const [ano, m] = mes.split('-');
+  const inicio = ano + '-' + m + '-01';
+  const fim = new Date(ano, m, 0).toISOString().split('T')[0];
+  const encomendas = await buscarEncomendasPeriodo(inicio, fim, null);
+  const mesFmt = new Date(ano, m-1).toLocaleDateString('pt-BR', {month:'long',year:'numeric'});
+  const pendentes = encomendas.filter(e => e.status === 'pendente').length;
+  const retiradas = encomendas.filter(e => e.status === 'retirada').length;
+  const doc = await criarPDF(
+    'Encomendas — ' + mesFmt,
+    'Total: ' + encomendas.length + ' | Retiradas: ' + retiradas + ' | Pendentes: ' + pendentes
+  );
+  adicionarTabelaEncomendas(doc, encomendas, 52);
+  doc.save('encomendas-' + mes + '.pdf');
+}
+
+async function gerarRelatorioEncomendasSala() {
+  const numero = document.getElementById('rel-enc-sala-numero').value;
+  const mes = document.getElementById('rel-enc-sala-mes').value;
+  if (!numero || !mes) { alert('Selecione a sala e o mes.'); return; }
+  const [ano, m] = mes.split('-');
+  const inicio = ano + '-' + m + '-01';
+  const fim = new Date(ano, m, 0).toISOString().split('T')[0];
+  const { data: sala } = await db.from('salas').select().eq('numero', numero).single();
+  if (!sala) { alert('Sala nao encontrada.'); return; }
+  const encomendas = await buscarEncomendasPeriodo(inicio, fim, sala.id);
+  const mesFmt = new Date(ano, m-1).toLocaleDateString('pt-BR', {month:'long',year:'numeric'});
+  const nomeSala = sala.nome_empresa ? numero + ' — ' + sala.nome_empresa : 'Sala ' + numero;
+  const pendentes = encomendas.filter(e => e.status === 'pendente').length;
+  const retiradas = encomendas.filter(e => e.status === 'retirada').length;
+  const doc = await criarPDF(
+    'Encomendas — ' + nomeSala + ' — ' + mesFmt,
+    'Total: ' + encomendas.length + ' | Retiradas: ' + retiradas + ' | Pendentes: ' + pendentes
+  );
+  adicionarTabelaEncomendas(doc, encomendas, 52);
+  doc.save('encomendas-sala-' + numero + '-' + mes + '.pdf');
+}
+
 document.getElementById('senha').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 db.auth.getSession().then(({ data }) => { if (data.session) mostrarDashboard(); });
 </script>
