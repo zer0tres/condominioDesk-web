@@ -312,7 +312,7 @@ async function criarPDF(titulo, subtitulo) {
   doc.rect(0, 0, 210, 30, 'F');
   const logoB64 = await carregarLogoBase64();
   if (logoB64) {
-    doc.addImage(logoB64, 'PNG', 155, 3, 45, 24);
+    doc.addImage(logoB64, 'PNG', 162, 5, 34, 18);
   }
   doc.setTextColor(255,255,255);
   doc.setFontSize(16); doc.setFont('helvetica','bold');
