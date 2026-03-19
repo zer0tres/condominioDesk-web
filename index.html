@@ -347,7 +347,7 @@ async function gerarRelatorioDia() {
   if (!data) { alert('Selecione uma data.'); return; }
   const reservas = await buscarReservasPeriodo(data, data);
   const dataFmt = new Date(data+'T12:00:00').toLocaleDateString('pt-BR', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  const doc = criarPDF(`Período: ${dataFmt}`, `Total de reservas: ${reservas.length}`);
+  const doc = await criarPDF(`Período: ${dataFmt}`, `Total de reservas: ${reservas.length}`);
   adicionarTabelaReservas(doc, reservas, 52);
   doc.save(`relatorio-${data}.pdf`);
 }
@@ -361,7 +361,7 @@ async function gerarRelatorioMes() {
   const reservas = await buscarReservasPeriodo(inicio, fim);
   const mesFmt = new Date(ano, m-1).toLocaleDateString('pt-BR', {month:'long',year:'numeric'});
   const total = reservas.reduce((s,r) => s+(parseFloat(r.valor_total)||0), 0);
-  const doc = criarPDF(`Relatório Mensal: ${mesFmt}`, `Total de reservas: ${reservas.length} | Valor total: R$ ${total.toFixed(2)}`);
+  const doc = await criarPDF(`Relatório Mensal: ${mesFmt}`, `Total de reservas: ${reservas.length} | Valor total: R$ ${total.toFixed(2)}`);
 
   // Agrupa por sala para resumo
   const porSala = {};
@@ -419,7 +419,7 @@ async function gerarRelatorioSala() {
   const total = reservasFmt.reduce((s,r) => s+(parseFloat(r.valor_total)||0), 0);
   const nomeSala = sala.nome_empresa ? `${numero} — ${sala.nome_empresa}` : `Sala ${numero}`;
 
-  const doc = criarPDF(`Sala: ${nomeSala} | Período: ${periodoFmt}`,
+  const doc = await criarPDF(`Sala: ${nomeSala} | Período: ${periodoFmt}`,
     `Total de reservas: ${reservasFmt.length} | Valor total: R$ ${total.toFixed(2)}`);
   adicionarTabelaReservas(doc, reservasFmt, 52);
   doc.save(`relatorio-sala-${numero}-${dataVal}.pdf`);
