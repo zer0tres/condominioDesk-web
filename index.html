@@ -93,6 +93,25 @@
     <div class="topbar-right">
       <span class="atualizado" id="atualizado-em"></span>
       <button class="btn-logout" onclick="logout()">Sair</button>
+
+      <div class="bloco-label">📦 Encomendas</div>
+      <div class="grid-2">
+        <div class="relatorio-box">
+          <h3>📦 Encomendas — Mensal Geral</h3>
+          <p>Todas as encomendas do predio em um mes.</p>
+          <div class="form-group" style="margin-bottom:12px"><label>Mes/Ano</label><input type="month" id="rel-enc-mes-data"></div>
+          <button class="btn-pdf" onclick="gerarRelatorioEncomendasMes()">📄 Gerar PDF</button>
+        </div>
+        <div class="relatorio-box">
+          <h3>📦 Encomendas — Por Sala e Mes</h3>
+          <p>Encomendas de uma sala especifica em um mes.</p>
+          <div class="form-group" style="margin-bottom:8px"><label>Sala</label>
+            <select id="rel-enc-sala-numero"><option value="">Selecione...</option></select>
+          </div>
+          <div class="form-group" style="margin-bottom:12px"><label>Mes/Ano</label><input type="month" id="rel-enc-sala-mes"></div>
+          <button class="btn-pdf" onclick="gerarRelatorioEncomendasSala()">📄 Gerar PDF</button>
+        </div>
+      </div>
     </div>
   </div>
   <div class="tabs">
