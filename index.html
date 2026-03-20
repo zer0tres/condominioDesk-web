@@ -59,7 +59,7 @@
     .info-item { display: flex; gap: 8px; align-items: flex-start; }
     .info-label { color: #999; font-size: 12px; }
     .info-value { font-weight: 600; font-size: 14px; }
-    .relatorio-box { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .relatorio-box { background: white; border-radius: 12px; padding: 24px; margin-bottom: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
     .relatorio-box h3 { color: #1a237e; margin-bottom: 8px; font-size: 15px; }
     .relatorio-box p { color: #666; font-size: 12px; margin-bottom: 12px; }
     .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
@@ -67,9 +67,9 @@
     .form-group label { font-size: 13px; font-weight: 600; color: #444; }
     .form-group input, .form-group select { padding: 10px 14px; border: 1.5px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none; min-width: 140px; }
     .form-group input:focus, .form-group select:focus { border-color: #1a237e; }
-    .btn-pdf { padding: 10px 20px; background: #c62828; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; justify-content: center; }
+    .btn-pdf { padding: 10px 20px; background: #c62828; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; justify-content: center; width: 100%; margin-top: 8px; }
     .btn-pdf:hover { background: #b71c1c; }
-    .bloco-label { margin-bottom: 8px; font-size: 13px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 1px; }
+    .bloco-label { margin: 0 0 12px; font-size: 13px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 1px; border-left: 4px solid #1a237e; padding-left: 10px; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
     @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } .content { padding: 16px; } .tabs { padding: 0 8px; } .topbar { padding: 12px 16px; } }
   </style>
@@ -93,32 +93,15 @@
     <div class="topbar-right">
       <span class="atualizado" id="atualizado-em"></span>
       <button class="btn-logout" onclick="logout()">Sair</button>
-
-      <div class="bloco-label">📦 Encomendas</div>
-      <div class="grid-2">
-        <div class="relatorio-box">
-          <h3>📦 Encomendas — Mensal Geral</h3>
-          <p>Todas as encomendas do predio em um mes.</p>
-          <div class="form-group" style="margin-bottom:12px"><label>Mes/Ano</label><input type="month" id="rel-enc-mes-data"></div>
-          <button class="btn-pdf" onclick="gerarRelatorioEncomendasMes()">📄 Gerar PDF</button>
-        </div>
-        <div class="relatorio-box">
-          <h3>📦 Encomendas — Por Sala e Mes</h3>
-          <p>Encomendas de uma sala especifica em um mes.</p>
-          <div class="form-group" style="margin-bottom:8px"><label>Sala</label>
-            <select id="rel-enc-sala-numero"><option value="">Selecione...</option></select>
-          </div>
-          <div class="form-group" style="margin-bottom:12px"><label>Mes/Ano</label><input type="month" id="rel-enc-sala-mes"></div>
-          <button class="btn-pdf" onclick="gerarRelatorioEncomendasSala()">📄 Gerar PDF</button>
-        </div>
-      </div>
     </div>
   </div>
+
   <div class="tabs">
     <div class="tab active" onclick="mudarTab('encomendas')">📦 Encomendas</div>
     <div class="tab" onclick="mudarTab('reservas')">🗓️ Reservas</div>
     <div class="tab" onclick="mudarTab('relatorios')">📄 Relatorios</div>
   </div>
+
   <div class="content">
 
     <div id="tab-encomendas" class="tab-content active">
@@ -133,7 +116,7 @@
       <div class="section-title">📄 Relatorios</div>
 
       <div class="bloco-label">🏢 Uso das Salas Comuns</div>
-      <div class="grid-2">
+      <div class="grid-2" style="margin-bottom:16px">
         <div class="relatorio-box">
           <h3>📅 Por Periodo (Entre Datas)</h3>
           <p>Relatorio geral de todas as salas entre duas datas.</p>
@@ -150,11 +133,13 @@
           <button class="btn-pdf" onclick="gerarRelatorioMes()">📄 Gerar PDF</button>
         </div>
       </div>
-      <div class="grid-2">
+
+      <div class="grid-2" style="margin-bottom:32px">
         <div class="relatorio-box">
           <h3>🏢 Por Sala — Periodo</h3>
           <p>Uso de uma sala especifica entre duas datas.</p>
-          <div class="form-group" style="margin-bottom:8px"><label>Sala</label>
+          <div class="form-group" style="margin-bottom:8px">
+            <label>Sala</label>
             <select id="rel-sala-numero"><option value="">Selecione...</option></select>
           </div>
           <div class="form-row">
@@ -163,8 +148,34 @@
           </div>
           <button class="btn-pdf" onclick="gerarRelatorioSala()">📄 Gerar PDF</button>
         </div>
+        <div style="display:flex;align-items:center;justify-content:center;color:#999;font-size:14px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+          <div style="text-align:center;padding:24px">
+            <div style="font-size:32px;margin-bottom:8px">💡</div>
+            <div>Use "Por Periodo" para filtrar<br>qualquer intervalo de datas,<br>inclusive um mes completo.</div>
+          </div>
+        </div>
       </div>
 
+      <div class="bloco-label">📦 Encomendas</div>
+      <div class="grid-2">
+        <div class="relatorio-box">
+          <h3>📦 Encomendas — Mensal Geral</h3>
+          <p>Todas as encomendas do predio em um mes.</p>
+          <div class="form-group" style="margin-bottom:12px"><label>Mes/Ano</label><input type="month" id="rel-enc-mes-data"></div>
+          <button class="btn-pdf" onclick="gerarRelatorioEncomendasMes()">📄 Gerar PDF</button>
+        </div>
+        <div class="relatorio-box">
+          <h3>📦 Encomendas — Por Sala e Mes</h3>
+          <p>Encomendas de uma sala especifica em um mes.</p>
+          <div class="form-group" style="margin-bottom:8px">
+            <label>Sala</label>
+            <select id="rel-enc-sala-numero"><option value="">Selecione...</option></select>
+          </div>
+          <div class="form-group" style="margin-bottom:12px"><label>Mes/Ano</label><input type="month" id="rel-enc-sala-mes"></div>
+          <button class="btn-pdf" onclick="gerarRelatorioEncomendasSala()">📄 Gerar PDF</button>
+        </div>
+      </div>
+    </div>
 
   </div>
 </div>
@@ -214,7 +225,7 @@ async function carregarEspacos() {
 async function carregarSalasSelect() {
   const { data } = await db.from('salas').select('numero, nome_empresa').order('numero');
   salasCache = (data || []).sort((a, b) => parseInt(a.numero) - parseInt(b.numero));
-  const selIds = ['rel-sala-numero','rel-sala-mes-numero','rel-enc-sala-numero'];
+  const selIds = ['rel-sala-numero','rel-enc-sala-numero'];
   selIds.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -419,8 +430,6 @@ async function gerarRelatorioPeriodo() {
   doc.save('relatorio-' + inicio + '-a-' + fim + '.pdf');
 }
 
-
-
 async function gerarRelatorioMes() {
   const mes = document.getElementById('rel-mes-data').value;
   if (!mes) { alert('Selecione um mes.'); return; }
@@ -461,24 +470,6 @@ async function gerarRelatorioSala() {
   doc.save('relatorio-sala-' + numero + '-' + inicio + '-' + fim + '.pdf');
 }
 
-async function gerarRelatorioSalaMes() {
-  const numero = document.getElementById('rel-sala-mes-numero').value;
-  const mes = document.getElementById('rel-sala-mes-data').value;
-  if (!numero || !mes) { alert('Selecione a sala e o mes.'); return; }
-  const [ano, m] = mes.split('-');
-  const inicio = ano+'-'+m+'-01';
-  const fim = new Date(ano, m, 0).toISOString().split('T')[0];
-  const { data: sala } = await db.from('salas').select().eq('numero', numero).single();
-  if (!sala) { alert('Sala nao encontrada.'); return; }
-  const reservas = await buscarReservasPeriodo(inicio, fim);
-  const filtradas = reservas.filter(r => r.sala_id === sala.id).map(r => ({ ...r, salas: { numero, nome_empresa: sala.nome_empresa } }));
-  const total = filtradas.reduce((s,r) => s+(parseFloat(r.valor_total)||0), 0);
-  const mesFmt = new Date(ano, m-1).toLocaleDateString('pt-BR', {month:'long',year:'numeric'});
-  const doc = await criarPDF('Sala ' + numero + ' | ' + mesFmt, 'Reservas: ' + filtradas.length + ' | Total: R$ ' + total.toFixed(2));
-  adicionarTabelaReservas(doc, filtradas, 52);
-  doc.save('relatorio-sala-' + numero + '-' + mes + '.pdf');
-}
-
 async function gerarRelatorioEncomendasMes() {
   const mes = document.getElementById('rel-enc-mes-data').value;
   if (!mes) { alert('Selecione um mes.'); return; }
@@ -511,9 +502,6 @@ async function gerarRelatorioEncomendasSala() {
   adicionarTabelaEncomendas(doc, encomendas, 52);
   doc.save('encomendas-sala-' + numero + '-' + mes + '.pdf');
 }
-
-
-
 
 document.getElementById('senha').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 db.auth.getSession().then(({ data }) => { if (data.session) mostrarDashboard(); });
