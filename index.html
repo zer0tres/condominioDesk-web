@@ -99,7 +99,6 @@
     <div class="tab active" onclick="mudarTab('encomendas')">📦 Encomendas</div>
     <div class="tab" onclick="mudarTab('reservas')">🗓️ Reservas</div>
     <div class="tab" onclick="mudarTab('relatorios')">📄 Relatorios</div>
-    <div class="tab" onclick="mudarTab('gerenciamento')">⚙️ Gerenciamento</div>
   </div>
   <div class="content">
 
@@ -179,39 +178,6 @@
       </div>
     </div>
 
-    <div id="tab-gerenciamento" class="tab-content">
-      <div class="section-title">⚙️ Gerenciamento de Salas</div>
-      <div class="grid-2">
-        <div class="relatorio-box">
-          <h3>🔑 Resetar Senha de Sala</h3>
-          <p>Volta a senha para o padrao sala+numero (ex: sala401).</p>
-          <div class="form-row">
-            <div class="form-group"><label>Numero da Sala</label><input type="text" id="reset-sala-numero" placeholder="Ex: 401"></div>
-            <button class="btn-pdf" style="background:#1a237e;align-self:flex-end" onclick="resetarSenha()">🔑 Resetar</button>
-          </div>
-          <p id="reset-msg" style="font-weight:600;margin-top:4px"></p>
-        </div>
-        <div class="relatorio-box">
-          <h3>🏢 Atualizar Nome da Empresa</h3>
-          <p>Atualiza o nome da empresa registrada em uma sala.</p>
-          <div class="form-row">
-            <div class="form-group"><label>Numero</label><input type="text" id="empresa-sala-numero" placeholder="Ex: 401"></div>
-            <div class="form-group"><label>Nome da Empresa</label><input type="text" id="empresa-sala-nome" placeholder="Nome..."></div>
-            <button class="btn-pdf" style="background:#2e7d32;align-self:flex-end" onclick="atualizarEmpresa()">✅ Salvar</button>
-          </div>
-          <p id="empresa-msg" style="font-weight:600;margin-top:4px"></p>
-        </div>
-      </div>
-      <div class="relatorio-box">
-        <h3>🗑️ Limpar Dados de uma Sala</h3>
-        <p>Remove todas as encomendas e reservas da sala e reseta a senha. Use quando uma nova empresa ocupar a sala.</p>
-        <div class="form-row">
-          <div class="form-group"><label>Numero da Sala</label><input type="text" id="limpar-sala-numero" placeholder="Ex: 401"></div>
-          <button class="btn-pdf" style="align-self:flex-end" onclick="limparSala()">🗑️ Limpar Sala</button>
-        </div>
-        <p id="limpar-msg" style="font-weight:600;margin-top:4px"></p>
-      </div>
-    </div>
 
   </div>
 </div>
@@ -332,7 +298,7 @@ async function carregarReservas() {
 }
 
 function mudarTab(tab) {
-  const tabs = ['encomendas','reservas','relatorios','gerenciamento'];
+  const tabs = ['encomendas','reservas','relatorios'];
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', tabs[i]===tab));
   tabs.forEach(t => { const el = document.getElementById('tab-'+t); if(el) el.classList.toggle('active', t===tab); });
 }
@@ -557,39 +523,8 @@ async function gerarRelatorioEncomendasSala() {
   doc.save('encomendas-sala-' + numero + '-' + mes + '.pdf');
 }
 
-async function resetarSenha() {
-  const numero = document.getElementById('reset-sala-numero').value.trim();
-  if (!numero) { alert('Informe o numero da sala.'); return; }
-  const msg = document.getElementById('reset-msg');
-  const { data: sala } = await db.from('salas').select('id').eq('numero', numero).single();
-  if (!sala) { msg.textContent = 'Sala nao encontrada.'; msg.style.color='red'; return; }
-  await db.from('salas').update({ senha: 'sala'+numero }).eq('id', sala.id);
-  msg.textContent = 'Senha resetada para sala' + numero; msg.style.color='green';
-}
 
-async function atualizarEmpresa() {
-  const numero = document.getElementById('empresa-sala-numero').value.trim();
-  const nome = document.getElementById('empresa-sala-nome').value.trim();
-  if (!numero || !nome) { alert('Preencha todos os campos.'); return; }
-  const msg = document.getElementById('empresa-msg');
-  const { data: sala } = await db.from('salas').select('id').eq('numero', numero).single();
-  if (!sala) { msg.textContent = 'Sala nao encontrada.'; msg.style.color='red'; return; }
-  await db.from('salas').update({ nome_empresa: nome }).eq('id', sala.id);
-  msg.textContent = 'Sala ' + numero + ' atualizada para ' + nome; msg.style.color='green';
-}
 
-async function limparSala() {
-  const numero = document.getElementById('limpar-sala-numero').value.trim();
-  if (!numero) { alert('Informe o numero da sala.'); return; }
-  if (!confirm('Limpar TODOS os dados da sala ' + numero + '? Esta acao nao pode ser desfeita.')) return;
-  const msg = document.getElementById('limpar-msg');
-  const { data: sala } = await db.from('salas').select('id').eq('numero', numero).single();
-  if (!sala) { msg.textContent = 'Sala nao encontrada.'; msg.style.color='red'; return; }
-  await db.from('encomendas').delete().eq('sala_id', sala.id);
-  await db.from('reservas').delete().eq('sala_id', sala.id);
-  await db.from('salas').update({ senha: 'sala'+numero, fcm_token: null, nome_empresa: null }).eq('id', sala.id);
-  msg.textContent = 'Sala ' + numero + ' limpa com sucesso.'; msg.style.color='green';
-}
 
 document.getElementById('senha').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 db.auth.getSession().then(({ data }) => { if (data.session) mostrarDashboard(); });
