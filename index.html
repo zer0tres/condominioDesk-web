@@ -124,6 +124,26 @@
           </div>
           <button class="btn-pdf" onclick="gerarRelatorioPeriodo()">📄 Gerar PDF</button>
         </div>
+        <div class="relatorio-box">
+          <h3>📆 Mensal Geral</h3>
+          <p>Resumo de todas as salas em um mes completo.</p>
+          <div class="form-group" style="margin-bottom:12px"><label>Mes/Ano</label><input type="month" id="rel-mes-data"></div>
+          <button class="btn-pdf" onclick="gerarRelatorioMes()">📄 Gerar PDF</button>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="relatorio-box">
+          <h3>🏢 Por Sala — Periodo</h3>
+          <p>Uso de uma sala especifica entre duas datas.</p>
+          <div class="form-group" style="margin-bottom:8px"><label>Sala</label>
+            <select id="rel-sala-numero"><option value="">Selecione...</option></select>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Data Inicio</label><input type="date" id="rel-sala-inicio"></div>
+            <div class="form-group"><label>Data Fim</label><input type="date" id="rel-sala-fim"></div>
+          </div>
+          <button class="btn-pdf" onclick="gerarRelatorioSala()">📄 Gerar PDF</button>
+        </div>
       </div>
 
 
@@ -380,6 +400,30 @@ async function gerarRelatorioPeriodo() {
   doc.save('relatorio-' + inicio + '-a-' + fim + '.pdf');
 }
 
+
+
+async function gerarRelatorioMes() {
+  const mes = document.getElementById('rel-mes-data').value;
+  if (!mes) { alert('Selecione um mes.'); return; }
+  const [ano, m] = mes.split('-');
+  const inicio = ano+'-'+m+'-01';
+  const fim = new Date(ano, m, 0).toISOString().split('T')[0];
+  const reservas = await buscarReservasPeriodo(inicio, fim);
+  const total = reservas.reduce((s,r) => s+(parseFloat(r.valor_total)||0), 0);
+  const porSala = {};
+  reservas.forEach(r => {
+    const key = r.salas ? r.salas.numero + (r.salas.nome_empresa ? ' - '+r.salas.nome_empresa : '') : 'Portaria';
+    porSala[key] = porSala[key] || { count: 0, valor: 0 };
+    porSala[key].count++; porSala[key].valor += parseFloat(r.valor_total)||0;
+  });
+  const mesFmt = new Date(ano, m-1).toLocaleDateString('pt-BR', {month:'long',year:'numeric'});
+  const doc = await criarPDF('Mensal: ' + mesFmt, 'Reservas: ' + reservas.length + ' | Total: R$ ' + total.toFixed(2));
+  doc.setFontSize(12); doc.setFont('helvetica','bold'); doc.text('Resumo por Sala', 14, 56);
+  doc.autoTable({ startY: 62, head: [['Sala','Qtd','Valor Total']], body: Object.entries(porSala).map(([k,v]) => [k, v.count, 'R$ '+v.valor.toFixed(2)]), headStyles: { fillColor: [26,35,126], textColor: 255, fontStyle: 'bold' }, bodyStyles: { fontSize: 9 }, margin: { left: 14, right: 14 } });
+  doc.addPage(); doc.setFontSize(12); doc.setFont('helvetica','bold'); doc.text('Detalhamento', 14, 20);
+  adicionarTabelaReservas(doc, reservas, 28);
+  doc.save('relatorio-' + mes + '.pdf');
+}
 
 async function gerarRelatorioSala() {
   const numero = document.getElementById('rel-sala-numero').value;
