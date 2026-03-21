@@ -105,6 +105,7 @@
     <div class="tab" onclick="mudarTab('reservas')">🗓️ Reservas</div>
     <div class="tab" onclick="mudarTab('relatorios')">📄 Relatorios</div>
     <div class="tab" onclick="mudarTab('nova-reserva')">➕ Nova Reserva</div>
+    <div class="tab" onclick="mudarTab('configuracoes')">⚙️ Configuracoes</div>
   </div>
 
   <div class="content">
@@ -182,6 +183,24 @@
       </div>
     </div>
 
+  <div id="tab-configuracoes" class="tab-content">
+      <div class="section-title">⚙️ Configuracoes do Predio</div>
+      <div class="relatorio-box">
+        <h3>🪑 Material Disponivel</h3>
+        <p>Altere o total de cadeiras e mesas disponiveis para reserva.</p>
+        <div id="cfg-loading" style="color:#666;font-size:13px">Carregando...</div>
+        <div id="cfg-form" style="display:none">
+          <div class="grid-2" style="margin-top:12px">
+            <div class="form-group"><label>Total de Cadeiras</label>
+              <input type="number" id="cfg-cadeiras" min="0" max="500" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div>
+            <div class="form-group"><label>Total de Mesas</label>
+              <input type="number" id="cfg-mesas" min="0" max="200" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div>
+          </div>
+          <button class="btn-pdf" style="background:#1a237e;width:auto;padding:10px 24px;margin-top:8px" onclick="salvarConfiguracoes()">💾 Salvar Alteracoes</button>
+          <p id="cfg-msg" style="font-size:13px;font-weight:600;margin-top:8px"></p>
+        </div>
+      </div>
+    </div>
   <div id="tab-nova-reserva" class="tab-content">
       <div class="section-title">➕ Nova Reserva</div>
       <div id="nova-reserva-portaria" class="loading"><div class="spinner"></div>Carregando...</div>
@@ -320,10 +339,11 @@ async function cancelarReservaPortaria(id, btn) {
 }
 
 function mudarTab(tab) {
-  const tabs = ['encomendas','reservas','relatorios','nova-reserva'];
+  const tabs = ['encomendas','reservas','relatorios','nova-reserva','configuracoes'];
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', tabs[i]===tab));
   tabs.forEach(t => { const el = document.getElementById('tab-'+t); if(el) el.classList.toggle('active', t===tab); });
   if (tab === 'nova-reserva' && !document.getElementById('nova-reserva-portaria').innerHTML.includes('res-p-data')) carregarEspacosPortaria();
+  if (tab === 'configuracoes') carregarConfiguracoes();
 }
 
 function abrirFoto(url,e) { e.stopPropagation(); document.getElementById('modal-img').src=url; document.getElementById('modal-foto').classList.add('open'); }
@@ -588,6 +608,10 @@ async function renderizarFormPortaria() {
     '<input type="number" id="res-p-mes" placeholder="Qtd" min="0" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div></div></div>' +
     '<div><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Observacoes (opcional)</label>' +
     '<textarea id="res-p-obs" rows="2" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;resize:none" placeholder="Informacoes adicionais..."></textarea></div>' +
+    '<div style="margin-top:12px"><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Lista de Convidados (opcional)</label>' +
+    '<p style="font-size:12px;color:#666;margin-bottom:8px">Nome e documento de cada participante.</p>' +
+    '<div id="conv-p-lista"></div>' +
+    '<button type="button" onclick="adicionarConvidadoP()" style="margin-top:8px;padding:8px 16px;background:white;color:#1a237e;border:1.5px solid #1a237e;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">+ Adicionar Convidado</button></div>' +
     '<div id="val-p-box" style="display:none;background:#e8eaf6;border-radius:10px;padding:14px 16px;justify-content:space-between;align-items:center;margin:12px 0">' +
     '<div><div style="font-size:13px;color:#666">Valor estimado</div><div style="font-size:11px;color:#999" id="val-p-det"></div></div>' +
     '<div style="font-size:22px;font-weight:700;color:#1a237e" id="val-p-total">R$ 0,00</div></div>' +
@@ -622,13 +646,13 @@ async function atualizarMaterialPortaria() {
   if (sec) sec.style.display = 'block';
   let maxCad = 0, maxMes = 0;
   espacosSelPortaria.forEach(id => { const e = espacosPortaria.find(e => e.id === id); if (!e) return; if (['Sala 1','Sala 2'].includes(e.nome)) { maxCad+=45; maxMes+=12; } if (e.nome==='Sala 3') { maxCad+=55; maxMes+=14; } });
-  maxCad = Math.min(maxCad, 115); maxMes = Math.min(maxMes, 33);
+  const { data: cfgP } = await db.from("configuracoes").select("chave, valor"); const maxCadG = (cfgP||[]).find(c=>c.chave==="max_cadeiras")?.valor || 115; const maxMesG = (cfgP||[]).find(c=>c.chave==="max_mesas")?.valor || 33; maxCad = Math.min(maxCad, maxCadG); maxMes = Math.min(maxMes, maxMesG);
   const inicio = (document.getElementById('res-p-inicio')?.value||'09:00') + ':00';
   const fim = (document.getElementById('res-p-fim')?.value||'11:00') + ':00';
   const data = document.getElementById('res-p-data')?.value || new Date().toISOString().split('T')[0];
   const { data: matRes } = await db.from('material_reservado').select().eq('data', data).lt('hora_inicio', fim).gt('hora_fim', inicio);
-  const cadDisp = Math.min(maxCad, 115-(matRes||[]).reduce((s,m)=>s+(m.num_cadeiras||0),0));
-  const mesDisp = Math.min(maxMes, 33-(matRes||[]).reduce((s,m)=>s+(m.num_mesas||0),0));
+  const cadDisp = Math.min(maxCad, maxCadG-(matRes||[]).reduce((s,m)=>s+(m.num_cadeiras||0),0));
+  const mesDisp = Math.min(maxMes, maxMesG-(matRes||[]).reduce((s,m)=>s+(m.num_mesas||0),0));
   const info = document.getElementById('mat-p-info');
   if (info) info.textContent = 'Disponivel: ' + cadDisp + ' cadeiras e ' + mesDisp + ' mesas';
   const ci = document.getElementById('res-p-cad'); const mi = document.getElementById('res-p-mes');
@@ -688,6 +712,7 @@ async function confirmarReservaPortaria() {
     espaco_ids: espacosSelPortaria, data, hora_inicio: inicio, hora_fim: fim,
     responsavel_nome: responsavel, sala_id: salaId, num_pessoas: parseInt(pessoas)||null,
     valor_total: total, observacoes: obs||null, num_cadeiras: cad, num_mesas: mes,
+    convidados: coletarConvidadosP(),
   }).select('id').single();
 
   if (error) { erroEl.textContent = 'Erro: ' + error.message; erroEl.style.display = 'block'; return; }
@@ -701,6 +726,97 @@ async function confirmarReservaPortaria() {
   sucEl.style.display = 'block';
   carregarReservas();
   renderizarFormPortaria();
+}
+
+async function carregarConfiguracoes() {
+  document.getElementById('cfg-loading').style.display = 'block';
+  document.getElementById('cfg-form').style.display = 'none';
+  const { data } = await db.from('configuracoes').select('chave, valor');
+  const cad = (data||[]).find(c=>c.chave==='max_cadeiras')?.valor || 115;
+  const mes = (data||[]).find(c=>c.chave==='max_mesas')?.valor || 33;
+  document.getElementById('cfg-cadeiras').value = cad;
+  document.getElementById('cfg-mesas').value = mes;
+  document.getElementById('cfg-loading').style.display = 'none';
+  document.getElementById('cfg-form').style.display = 'block';
+}
+async function salvarConfiguracoes() {
+  const cad = parseInt(document.getElementById('cfg-cadeiras').value);
+  const mes = parseInt(document.getElementById('cfg-mesas').value);
+  const msg = document.getElementById('cfg-msg');
+  if (!cad || !mes) { msg.textContent = 'Valores invalidos.'; msg.style.color='#e53935'; return; }
+  await db.from('configuracoes').update({ valor: cad }).eq('chave', 'max_cadeiras');
+  await db.from('configuracoes').update({ valor: mes }).eq('chave', 'max_mesas');
+  msg.textContent = '✅ Salvo! ' + cad + ' cadeiras e ' + mes + ' mesas.'; msg.style.color='#2e7d32';
+}
+let convPCount = 0;
+function adicionarConvidadoP() {
+  convPCount++;
+  const id = convPCount;
+  const div = document.createElement('div');
+  div.id = 'convp-' + id;
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
+  div.innerHTML = '<input type="text" placeholder="Nome completo" style="padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px" id="convp-nome-' + id + '">' +
+    '<input type="text" placeholder="RG/CPF" style="padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px" id="convp-doc-' + id + '">' +
+    '<button onclick="document.getElementById(\'convp-\'+' + id + ').remove()" style="padding:8px 12px;background:none;color:#e53935;border:1px solid #e53935;border-radius:8px;cursor:pointer">✕</button>';
+  document.getElementById('conv-p-lista').appendChild(div);
+}
+function coletarConvidadosP() {
+  const lista = [];
+  document.querySelectorAll('[id^="convp-nome-"]').forEach(input => {
+    const id = input.id.replace('convp-nome-', '');
+    const nome = input.value.trim();
+    const doc = document.getElementById('convp-doc-' + id)?.value?.trim() || '';
+    if (nome) lista.push({ nome, documento: doc });
+  });
+  return lista;
+}
+let convCount = 0;
+function adicionarConvidado() {
+  convCount++;
+  const id = convCount;
+  const div = document.createElement('div');
+  div.id = 'conv-' + id;
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
+  div.innerHTML = '<input type="text" placeholder="Nome completo" style="padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px" id="conv-nome-' + id + '">' +
+    '<input type="text" placeholder="RG/CPF" style="padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px" id="conv-doc-' + id + '">' +
+    '<button onclick="document.getElementById(\'conv-\'+' + id + ').remove()" style="padding:8px 12px;background:none;color:#e53935;border:1px solid #e53935;border-radius:8px;cursor:pointer">✕</button>';
+  document.getElementById('convidados-lista').appendChild(div);
+}
+function coletarConvidados() {
+  const lista = [];
+  document.querySelectorAll('[id^="conv-nome-"]').forEach(input => {
+    const id = input.id.replace('conv-nome-', '');
+    const nome = input.value.trim();
+    const doc = document.getElementById('conv-doc-' + id)?.value?.trim() || '';
+    if (nome) lista.push({ nome, documento: doc });
+  });
+  return lista;
+}
+async function gerarPDFConvidados(reserva) {
+  const { jsPDF } = window.jspdf;
+  const convidados = reserva.convidados || [];
+  const dataFmt = new Date(reserva.data+'T12:00:00').toLocaleDateString('pt-BR', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const nomesEsp = (reserva.espaco_ids||[]).map(id => { const e = espacosCache.find(e=>e.id===id); return e?e.nome:id; }).join(' + ');
+  const doc = await criarPDF('Lista de Convidados - ' + nomesEsp, 'Data: ' + dataFmt + ' | ' + reserva.hora_inicio.substring(0,5) + ' - ' + reserva.hora_fim.substring(0,5) + ' | Resp: ' + reserva.responsavel_nome);
+  if (!convidados.length) {
+    doc.setFontSize(12); doc.setTextColor(150,150,150);
+    doc.text('Nenhum convidado registrado.', 14, 56);
+  } else {
+    doc.autoTable({
+      startY: 52,
+      head: [['#', 'Nome Completo', 'Documento (RG/CPF)']],
+      body: convidados.map((c,i) => [i+1, c.nome, c.documento||'-']),
+      headStyles: { fillColor: [26,35,126], textColor: 255, fontStyle: 'bold', fontSize: 11 },
+      bodyStyles: { fontSize: 10 },
+      alternateRowStyles: { fillColor: [248,249,255] },
+      columnStyles: { 0:{cellWidth:14}, 1:{cellWidth:100}, 2:{cellWidth:70} },
+      margin: { left: 14, right: 14 },
+    });
+    const y = doc.lastAutoTable.finalY + 12;
+    doc.setFontSize(10); doc.setTextColor(150,150,150);
+    doc.text('Total: ' + convidados.length + ' convidados', 14, y);
+  }
+  doc.save('convidados-' + reserva.data + '.pdf');
 }
 
 document.getElementById('senha').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
