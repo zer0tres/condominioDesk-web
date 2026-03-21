@@ -280,6 +280,7 @@ async function carregarEncomendas() {
 
 async function carregarReservas() {
   if (!salaAtual) return;
+  if (!espacosCache.length) { const { data: esp } = await db.from('espacos_comuns').select(); espacosCache = esp || []; }
   const hoje = new Date().toISOString().split('T')[0];
   const { data } = await db.from('reservas').select().eq('sala_id', salaAtual.id).gte('data', hoje).order('data').order('hora_inicio');
   const reservas = data || [];

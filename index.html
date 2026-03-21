@@ -288,8 +288,7 @@ async function carregarReservas() {
   Object.entries(porData).forEach(([data, lista]) => {
     html += '<div class="data-header ' + (isHoje(data) ? 'hoje' : '') + '">' + (isHoje(data) ? 'Hoje — ' : '') + new Date(data+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}) + '</div>';
     lista.forEach(r => {
-      const d48 = new Date(r.data + 'T' + r.hora_inicio); d48.setHours(d48.getHours()-48);
-      const podeCancelar = new Date() < d48;
+      const podeCancelar = true; // Portaria pode cancelar qualquer reserva
       const nomeSala = r.salas ? 'Sala ' + r.salas.numero + (r.salas.nome_empresa ? ' — ' + r.salas.nome_empresa : '') : '';
       html += '<div class="card ' + (isHoje(data) ? 'reserva-hoje' : '') + '"><div class="card-header"><div>' +
         '<div class="card-title">' + nomesEspacos(r.espaco_ids) + '</div>' +
