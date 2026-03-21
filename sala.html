@@ -297,7 +297,7 @@ async function carregarReservas() {
   let html = '';
   reservas.forEach(r => {
     const nomesEsp = (r.espaco_ids || []).map(id => { const e = espacosCache.find(e => e.id === id); return e ? e.nome : id; }).join(' + ');
-    html += '<div class="card ' + (isHoje(r.data) ? 'reserva-hoje' : '') + '" style="cursor:pointer" onclick="abrirDetalhesReserva(\'' + r.id + '')">' +
+    html += '<div class="card ' + (isHoje(r.data) ? 'reserva-hoje' : '') + '" style="cursor:pointer" onclick="abrirDetalhesReserva(\'' + r.id + '\')">' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
       '<div>' +
       '<div class="card-title">' + nomesEsp + '</div>' +
