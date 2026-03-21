@@ -587,6 +587,10 @@ async function confirmarReserva() {
 
   const cadeiras = parseInt(document.getElementById('res-cadeiras')?.value || 0) || 0;
   const mesas = parseInt(document.getElementById('res-mesas')?.value || 0) || 0;
+  const maxCadInput = parseInt(document.getElementById('res-cadeiras')?.max || 999);
+  const maxMesInput = parseInt(document.getElementById('res-mesas')?.max || 999);
+  if (cadeiras > maxCadInput) { erroEl.textContent = 'Quantidade de cadeiras excede o limite disponivel (' + maxCadInput + ').'; erroEl.style.display = 'block'; return; }
+  if (mesas > maxMesInput) { erroEl.textContent = 'Quantidade de mesas excede o limite disponivel (' + maxMesInput + ').'; erroEl.style.display = 'block'; return; }
 
   const { data: reserva, error } = await db.from('reservas').insert({
     espaco_ids: espacosSelecionados,
