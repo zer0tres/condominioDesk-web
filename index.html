@@ -88,7 +88,10 @@
     <h1>🏢 AR3000</h1>
     <p>Painel de visualizacao — acesso administrativo</p>
     <input type="email" id="email" placeholder="Email" value="portaria@condominioDesk.com">
-    <input type="password" id="senha" placeholder="Senha">
+    <div style="position:relative">
+      <input type="password" id="senha" placeholder="Senha" style="width:100%;padding:14px 48px 14px 16px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:15px;margin-bottom:16px;outline:none">
+      <button onclick="toggleSenhaPortaria()" type="button" style="position:absolute;right:12px;top:14px;background:none;border:none;cursor:pointer;color:#999;font-size:18px">👁</button>
+    </div>
     <button class="btn-primary" onclick="login()">Entrar</button>
     <p class="erro" id="erro-login"></p>
   </div>
@@ -223,6 +226,11 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 let intervalo = null, espacosCache = [], salasCache = [];
+
+function toggleSenhaPortaria() {
+  const input = document.getElementById('senha');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
 
 async function login() {
   const email = document.getElementById('email').value;
