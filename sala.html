@@ -674,7 +674,7 @@ async function enviarEmailReserva(dados) {
   try {
     await fetch('https://aatpmxexgrtknnafjhqu.supabase.co/functions/v1/enviar-email-reserva', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhdHBteGV4Z3J0a25uYWZqaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNDkyNzIsImV4cCI6MjA4ODkyNTI3Mn0.ugx_4mE_ZSz7FE0rwOvsw5R4Psg27hefsG0TTIEYDbc' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhdHBteGV4Z3J0a25uYWZqaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNDkyNzIsImV4cCI6MjA4ODkyNTI3Mn0.ugx_4mE_ZSz7FE0rwOvsw5R4Psg27hefsG0TTIEYDbc' },
       body: JSON.stringify(dados)
     });
   } catch(e) { console.error('Erro ao enviar email:', e); }
