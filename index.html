@@ -596,7 +596,7 @@ async function renderizarFormPortaria() {
       const v = valoresPortaria[e.nome] !== undefined ? valoresPortaria[e.nome] : 105;
       return '<div class="espaco-item-p" id="esp-p-' + e.id + '" onclick="toggleEspacoP(\'' + e.id + '\')">' +
         '<div style="flex:1"><div style="font-weight:600;font-size:14px">' + e.nome + '</div>' +
-        '<div style="font-size:12px;color:#1a237e;font-weight:600">' + (v===0?'Gratuito':'R$ '+v+' por periodo de 2h') + '</div></div>' +
+        '<div style="font-size:12px;color:#1a237e;font-weight:600">' + (v===0?'Gratuito':(e.nome==='Copa'?'R$ 50 por reserva (valor fixo)':'R$ '+v+' por periodo de 2h')) + '</div></div>' +
         '<span id="chk-p-' + e.id + '">☐</span></div>';
     }).join('') + '</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +

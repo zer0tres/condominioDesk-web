@@ -373,7 +373,7 @@ async function renderizarFormReserva() {
           return '<div class="espaco-item' + (bloqueado ? ' blocked' : '') + '" id="esp-' + e.id + '" onclick="toggleEspaco(\'' + e.id + '\',\'' + e.nome + '\',' + bloqueado + ')">' +
             '<div style="flex:1">' +
             '<div class="espaco-nome">' + e.nome + '</div>' +
-            '<div class="espaco-valor' + (valor===0?' gratis':'') + '">' + (bloqueado ? 'Ja reservado hoje por outra sala' : valor === 0 ? 'Gratuito' : 'R$ ' + valor + ' por periodo de 2h') + '</div>' +
+            '<div class="espaco-valor' + (valor===0?' gratis':'') + '">' + (bloqueado ? 'Ja reservado hoje por outra sala' : valor === 0 ? 'Gratuito' : (e.nome === 'Copa' ? 'R$ 50 por reserva (valor fixo)' : 'R$ ' + valor + ' por periodo de 2h')) + '</div>' +
             '</div>' +
             '<span id="check-' + e.id + '">☐</span>' +
             '</div>';
