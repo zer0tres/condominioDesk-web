@@ -75,6 +75,9 @@
     .espaco-item-p.selected { border-color: #1a237e; background: #e8eaf6; }
     .bloco-label { margin: 0 0 12px; font-size: 13px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 1px; border-left: 4px solid #1a237e; padding-left: 10px; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .modal-reserva { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 20px; }
+    .modal-reserva.open { display: flex; }
+    .modal-card { background: white; border-radius: 16px; padding: 24px; width: 100%; max-width: 600px; margin: auto; }
     @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } .content { padding: 16px; } .tabs { padding: 0 8px; } .topbar { padding: 12px 16px; } }
   </style>
 </head>
@@ -307,24 +310,18 @@ async function carregarReservas() {
   Object.entries(porData).forEach(([data, lista]) => {
     html += '<div class="data-header ' + (isHoje(data) ? 'hoje' : '') + '">' + (isHoje(data) ? 'Hoje — ' : '') + new Date(data+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}) + '</div>';
     lista.forEach(r => {
-      const podeCancelar = true; // Portaria pode cancelar qualquer reserva
       const nomeSala = r.salas ? 'Sala ' + r.salas.numero + (r.salas.nome_empresa ? ' — ' + r.salas.nome_empresa : '') : '';
-      html += '<div class="card ' + (isHoje(data) ? 'reserva-hoje' : '') + '"><div class="card-header"><div>' +
+      html += '<div class="card ' + (isHoje(data) ? 'reserva-hoje' : '') + '" style="cursor:pointer" onclick="abrirDetalhesPortaria(\'' + r.id + '\')">' +
+        '<div class="card-header"><div>' +
         '<div class="card-title">' + nomesEspacos(r.espaco_ids) + '</div>' +
         (nomeSala ? '<div class="card-sub" style="color:#1a237e;font-weight:600">🏢 ' + nomeSala + '</div>' : '') +
         '<div class="card-sub">🕐 ' + r.hora_inicio.substring(0,5) + ' — ' + r.hora_fim.substring(0,5) + '</div>' +
         '<div class="card-sub">👤 ' + r.responsavel_nome + '</div>' +
-        '</div>' + (isHoje(data) ? '<span class="chip hoje">Hoje</span>' : '') + '</div>' +
-        '<div class="info-grid" style="margin-top:12px">' +
-        (r.num_pessoas ? '<div class="info-item"><span>👥</span><div><div class="info-label">Pessoas</div><div class="info-value">' + r.num_pessoas + '</div></div></div>' : '') +
-        (r.valor_total ? '<div class="info-item"><span>💰</span><div><div class="info-label">Valor</div><div class="info-value">R$ ' + parseFloat(r.valor_total).toFixed(2) + '</div></div></div>' : '') +
-        (r.num_cadeiras ? '<div class="info-item"><span>🪑</span><div><div class="info-label">Cadeiras</div><div class="info-value">' + r.num_cadeiras + '</div></div></div>' : '') +
-        (r.num_mesas ? '<div class="info-item"><span>🪵</span><div><div class="info-label">Mesas</div><div class="info-value">' + r.num_mesas + '</div></div></div>' : '') +
-        (r.observacoes ? '<div class="info-item"><span>📝</span><div><div class="info-label">Obs</div><div class="info-value">' + r.observacoes + '</div></div></div>' : '') +
-        '</div><div style="margin-top:10px">' +
-        '<button style="font-size:12px;color:' + (podeCancelar?'#e53935':'#ccc') + ';background:none;border:1px solid ' + (podeCancelar?'#e53935':'#ccc') + ';border-radius:6px;padding:5px 12px;cursor:' + (podeCancelar?'pointer':'not-allowed') + '" ' + (!podeCancelar?'disabled':'') + ' onclick="cancelarReservaPortaria(\'' + r.id + '\',this)">' + (podeCancelar?'🗑️ Cancelar':'⏰ Prazo encerrado') + '</button>' +
-        (!podeCancelar ? '<span style="font-size:11px;color:#f57c00;margin-left:8px">So ate 48h antes</span>' : '') +
-        '</div></div>';
+        (r.valor_total ? '<div class="card-sub" style="color:#1a237e;font-weight:600">💰 R$ ' + parseFloat(r.valor_total).toFixed(2) + '</div>' : '') +
+        '</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">' +
+        (isHoje(data) ? '<span class="chip hoje">Hoje</span>' : '') +
+        (r.convidados && r.convidados.length ? '<span style="font-size:11px;color:#1a237e;background:#e8eaf6;padding:2px 8px;border-radius:10px">👥 '+r.convidados.length+' convidados</span>' : '') +
+        '</div></div></div>';
     });
   });
   el.innerHTML = html;
@@ -933,9 +930,76 @@ function fecharModalEditPortaria() {
   reservaEditPortaria = null;
 }
 
+
+async function abrirDetalhesPortaria(reservaId) {
+  const { data: r } = await db.from('reservas').select('*, salas(numero, nome_empresa)').eq('id', reservaId).single();
+  if (!r) return;
+  const nomesEsp = (r.espaco_ids||[]).map(id=>{const e=espacosCache.find(e=>e.id===id);return e?e.nome:id;}).join(' + ');
+  const nomeSala = r.salas ? 'Sala '+r.salas.numero+(r.salas.nome_empresa?' — '+r.salas.nome_empresa:'') : 'Portaria';
+  const dataFmt = new Date(r.data+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  const modal = document.getElementById('modal-detalhes-portaria');
+  modal.innerHTML = '<div class="modal-card" style="max-width:580px">' +
+    '<h2 style="color:#1a237e;margin-bottom:16px">🗓️ Detalhes da Reserva</h2>' +
+    '<div style="background:#e8eaf6;border-radius:10px;padding:16px;margin-bottom:16px">' +
+    '<div style="font-weight:700;font-size:16px;color:#1a237e;margin-bottom:8px">'+nomesEsp+'</div>' +
+    '<div style="font-size:14px;color:#444;margin-bottom:4px">🏢 '+nomeSala+'</div>' +
+    '<div style="font-size:14px;color:#444;margin-bottom:4px">📅 '+dataFmt+'</div>' +
+    '<div style="font-size:14px;color:#444;margin-bottom:4px">🕐 '+r.hora_inicio.substring(0,5)+' — '+r.hora_fim.substring(0,5)+'</div>' +
+    '<div style="font-size:14px;color:#444;margin-bottom:4px">👤 '+r.responsavel_nome+'</div>' +
+    (r.num_pessoas ? '<div style="font-size:14px;color:#444;margin-bottom:4px">👥 '+r.num_pessoas+' pessoas</div>' : '') +
+    (r.num_cadeiras ? '<div style="font-size:14px;color:#444;margin-bottom:4px">🪑 '+r.num_cadeiras+' cadeiras</div>' : '') +
+    (r.num_mesas ? '<div style="font-size:14px;color:#444;margin-bottom:4px">🪵 '+r.num_mesas+' mesas</div>' : '') +
+    (r.valor_total ? '<div style="font-size:16px;font-weight:700;color:#1a237e;margin-top:8px">💰 R$ '+parseFloat(r.valor_total).toFixed(2)+'</div>' : '') +
+    (r.observacoes ? '<div style="font-size:13px;color:#666;margin-top:8px;border-top:1px solid #c5cae9;padding-top:8px">📝 '+r.observacoes+'</div>' : '') +
+    '</div>' +
+    (r.convidados && r.convidados.length ? '<div style="margin-bottom:16px"><div style="font-weight:600;font-size:14px;color:#444;margin-bottom:8px">👥 Convidados ('+r.convidados.length+')</div>' +
+    r.convidados.map((c,i)=>'<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><span style="color:#999;min-width:24px">'+(i+1)+'.</span><span style="flex:1">'+c.nome+'</span><span style="color:#666">'+(c.documento||'—')+'</span></div>').join('') + '</div>' : '') +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    '<button onclick="abrirEdicaoPortaria(\'' + r.id + '\')" style="flex:1;padding:10px;background:#1a237e;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">✏️ Editar</button>' +
+    (r.convidados && r.convidados.length ? '<button onclick="gerarPDFConvidadosPortaria(\'' + r.id + '\')" style="flex:1;padding:10px;background:#00695c;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">📄 PDF Convidados</button>' : '') +
+    '<button onclick="cancelarReservaDetalhesP(\'' + r.id + '\')" style="flex:1;padding:10px;background:#e53935;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">🗑️ Cancelar</button>' +
+    '</div>' +
+    '<button onclick="fecharDetalhesPortaria()" style="width:100%;padding:10px;background:white;color:#666;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;cursor:pointer;margin-top:8px">Fechar</button>' +
+    '</div>';
+  modal.classList.add('open');
+}
+
+async function cancelarReservaDetalhesP(id) {
+  if (!confirm('Cancelar esta reserva?')) return;
+  await db.from('reservas').delete().eq('id', id);
+  await db.from('material_reservado').delete().eq('reserva_id', id);
+  fecharDetalhesPortaria();
+  carregarReservas();
+}
+
+function fecharDetalhesPortaria() {
+  document.getElementById('modal-detalhes-portaria').classList.remove('open');
+}
+
+async function gerarPDFConvidadosPortaria(reservaId) {
+  const { data: r } = await db.from('reservas').select().eq('id', reservaId).single();
+  if (!r || !r.convidados || !r.convidados.length) { alert('Nenhum convidado registrado.'); return; }
+  const nomesEsp = (r.espaco_ids||[]).map(id=>{const e=espacosCache.find(e=>e.id===id);return e?e.nome:id;}).join(' + ');
+  const dataFmt = new Date(r.data+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const doc = await criarPDF('Lista de Convidados - '+nomesEsp, 'Data: '+dataFmt+' | '+r.hora_inicio.substring(0,5)+' - '+r.hora_fim.substring(0,5)+' | Resp: '+r.responsavel_nome);
+  doc.autoTable({
+    startY:52, head:[['#','Nome Completo','Documento (RG/CPF)']],
+    body:r.convidados.map((c,i)=>[i+1,c.nome,c.documento||'-']),
+    headStyles:{fillColor:[26,35,126],textColor:255,fontStyle:'bold',fontSize:11},
+    bodyStyles:{fontSize:10}, alternateRowStyles:{fillColor:[248,249,255]},
+    columnStyles:{0:{cellWidth:14},1:{cellWidth:100},2:{cellWidth:70}}, margin:{left:14,right:14},
+  });
+  doc.setFontSize(10); doc.setTextColor(150,150,150);
+  doc.text('Total: '+r.convidados.length+' convidados | Gerado em: '+new Date().toLocaleString('pt-BR'), 14, doc.lastAutoTable.finalY+12);
+  doc.save('convidados-'+r.data+'.pdf');
+}
+
 document.getElementById('senha').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 db.auth.getSession().then(({ data }) => { if (data.session) mostrarDashboard(); });
 </script>
+
+<div class="modal-reserva" id="modal-detalhes-portaria" onclick="if(event.target===this)fecharDetalhesPortaria()"></div>
 
 <div class="modal-reserva" id="modal-edit-portaria">
   <div class="modal-card" style="max-width:650px">
