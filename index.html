@@ -69,6 +69,10 @@
     .form-group input:focus, .form-group select:focus { border-color: #1a237e; }
     .btn-pdf { padding: 10px 20px; background: #c62828; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; justify-content: center; width: 100%; margin-top: 8px; }
     .btn-pdf:hover { background: #b71c1c; }
+    .btn-verde { padding: 12px 20px; background: #00695c; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 12px; }
+    .btn-verde:hover { background: #00796b; }
+    .espaco-item-p { padding: 12px 16px; border: 1.5px solid #e0e0e0; border-radius: 10px; cursor: pointer; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; transition: all 0.15s; }
+    .espaco-item-p.selected { border-color: #1a237e; background: #e8eaf6; }
     .bloco-label { margin: 0 0 12px; font-size: 13px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 1px; border-left: 4px solid #1a237e; padding-left: 10px; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
     @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } .content { padding: 16px; } .tabs { padding: 0 8px; } .topbar { padding: 12px 16px; } }
@@ -100,6 +104,7 @@
     <div class="tab active" onclick="mudarTab('encomendas')">📦 Encomendas</div>
     <div class="tab" onclick="mudarTab('reservas')">🗓️ Reservas</div>
     <div class="tab" onclick="mudarTab('relatorios')">📄 Relatorios</div>
+    <div class="tab" onclick="mudarTab('nova-reserva')">➕ Nova Reserva</div>
   </div>
 
   <div class="content">
@@ -175,6 +180,11 @@
           <button class="btn-pdf" onclick="gerarRelatorioEncomendasSala()">📄 Gerar PDF</button>
         </div>
       </div>
+    </div>
+
+  <div id="tab-nova-reserva" class="tab-content">
+      <div class="section-title">➕ Nova Reserva</div>
+      <div id="nova-reserva-portaria" class="loading"><div class="spinner"></div>Carregando...</div>
     </div>
 
   </div>
@@ -268,7 +278,7 @@ async function carregarEncomendas() {
 
 async function carregarReservas() {
   const hoje = new Date().toISOString().split('T')[0];
-  const { data: reservas } = await db.from('reservas').select().gte('data', hoje).order('data').order('hora_inicio');
+  const { data: reservas } = await db.from('reservas').select('*, salas(numero, nome_empresa)').gte('data', hoje).order('data').order('hora_inicio');
   const el = document.getElementById('reservas-content');
   if (!reservas || !reservas.length) { el.innerHTML = '<div class="empty"><div class="icon">📅</div>Nenhuma reserva proxima</div>'; return; }
   const porData = {};
@@ -278,8 +288,12 @@ async function carregarReservas() {
   Object.entries(porData).forEach(([data, lista]) => {
     html += '<div class="data-header ' + (isHoje(data) ? 'hoje' : '') + '">' + (isHoje(data) ? 'Hoje — ' : '') + new Date(data+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}) + '</div>';
     lista.forEach(r => {
+      const d48 = new Date(r.data + 'T' + r.hora_inicio); d48.setHours(d48.getHours()-48);
+      const podeCancelar = new Date() < d48;
+      const nomeSala = r.salas ? 'Sala ' + r.salas.numero + (r.salas.nome_empresa ? ' — ' + r.salas.nome_empresa : '') : '';
       html += '<div class="card ' + (isHoje(data) ? 'reserva-hoje' : '') + '"><div class="card-header"><div>' +
         '<div class="card-title">' + nomesEspacos(r.espaco_ids) + '</div>' +
+        (nomeSala ? '<div class="card-sub" style="color:#1a237e;font-weight:600">🏢 ' + nomeSala + '</div>' : '') +
         '<div class="card-sub">🕐 ' + r.hora_inicio.substring(0,5) + ' — ' + r.hora_fim.substring(0,5) + '</div>' +
         '<div class="card-sub">👤 ' + r.responsavel_nome + '</div>' +
         '</div>' + (isHoje(data) ? '<span class="chip hoje">Hoje</span>' : '') + '</div>' +
@@ -289,16 +303,28 @@ async function carregarReservas() {
         (r.num_cadeiras ? '<div class="info-item"><span>🪑</span><div><div class="info-label">Cadeiras</div><div class="info-value">' + r.num_cadeiras + '</div></div></div>' : '') +
         (r.num_mesas ? '<div class="info-item"><span>🪵</span><div><div class="info-label">Mesas</div><div class="info-value">' + r.num_mesas + '</div></div></div>' : '') +
         (r.observacoes ? '<div class="info-item"><span>📝</span><div><div class="info-label">Obs</div><div class="info-value">' + r.observacoes + '</div></div></div>' : '') +
+        '</div><div style="margin-top:10px">' +
+        '<button style="font-size:12px;color:' + (podeCancelar?'#e53935':'#ccc') + ';background:none;border:1px solid ' + (podeCancelar?'#e53935':'#ccc') + ';border-radius:6px;padding:5px 12px;cursor:' + (podeCancelar?'pointer':'not-allowed') + '" ' + (!podeCancelar?'disabled':'') + ' onclick="cancelarReservaPortaria(\'' + r.id + '\',this)">' + (podeCancelar?'🗑️ Cancelar':'⏰ Prazo encerrado') + '</button>' +
+        (!podeCancelar ? '<span style="font-size:11px;color:#f57c00;margin-left:8px">So ate 48h antes</span>' : '') +
         '</div></div>';
     });
   });
   el.innerHTML = html;
 }
 
+async function cancelarReservaPortaria(id, btn) {
+  if (!confirm('Cancelar esta reserva?')) return;
+  btn.disabled = true; btn.textContent = 'Cancelando...';
+  await db.from('reservas').delete().eq('id', id);
+  await db.from('material_reservado').delete().eq('reserva_id', id);
+  carregarReservas();
+}
+
 function mudarTab(tab) {
-  const tabs = ['encomendas','reservas','relatorios'];
+  const tabs = ['encomendas','reservas','relatorios','nova-reserva'];
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', tabs[i]===tab));
   tabs.forEach(t => { const el = document.getElementById('tab-'+t); if(el) el.classList.toggle('active', t===tab); });
+  if (tab === 'nova-reserva' && !document.getElementById('nova-reserva-portaria').innerHTML.includes('res-p-data')) carregarEspacosPortaria();
 }
 
 function abrirFoto(url,e) { e.stopPropagation(); document.getElementById('modal-img').src=url; document.getElementById('modal-foto').classList.add('open'); }
@@ -501,6 +527,181 @@ async function gerarRelatorioEncomendasSala() {
   const doc = await criarPDF('Encomendas Sala ' + numero + ' — ' + mesFmt, 'Total: ' + encomendas.length + ' | Retiradas: ' + r + ' | Pendentes: ' + p);
   adicionarTabelaEncomendas(doc, encomendas, 52);
   doc.save('encomendas-sala-' + numero + '-' + mes + '.pdf');
+}
+
+
+async function enviarEmailReserva(dados) {
+  try {
+    await fetch('https://aatpmxexgrtknnafjhqu.supabase.co/functions/v1/enviar-email-reserva', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhdHBteGV4Z3J0a25uYWZqaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNDkyNzIsImV4cCI6MjA4ODkyNTI3Mn0.ugx_4mE_ZSz7FE0rwOvsw5R4Psg27hefsG0TTIEYDbc' },
+      body: JSON.stringify(dados)
+    });
+  } catch(e) { console.error('Erro ao enviar email:', e); }
+}
+
+
+let espacosPortaria = [], espacosSelPortaria = [];
+const valoresPortaria = { 'Sala 1': 105, 'Sala 2': 105, 'Sala 3': 150, 'Sala de Reunioes': 105, 'Copa': 50, 'Coffee': 0 };
+
+async function carregarEspacosPortaria() {
+  const { data } = await db.from('espacos_comuns').select();
+  espacosPortaria = data || [];
+  renderizarFormPortaria();
+}
+
+async function renderizarFormPortaria() {
+  const hoje = new Date().toISOString().split('T')[0];
+  const el = document.getElementById('nova-reserva-portaria');
+  el.innerHTML = '<div id="erro-res-p" style="display:none;color:#e53935;font-size:13px;padding:10px 14px;background:#ffebee;border-radius:8px;margin-bottom:12px"></div>' +
+    '<div id="suc-res-p" style="display:none;color:#2e7d32;font-size:13px;padding:10px 14px;background:#e8f5e9;border-radius:8px;margin-bottom:12px"></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+    '<div><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Sala (opcional)</label>' +
+    '<select id="res-p-sala" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"><option value="">Portaria / Sem sala</option></select></div>' +
+    '<div><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Responsavel</label>' +
+    '<input type="text" id="res-p-resp" placeholder="Nome do responsavel" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
+    '<div><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Data</label>' +
+    '<input type="date" id="res-p-data" min="' + hoje + '" value="' + hoje + '" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div>' +
+    '<div><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Inicio</label>' +
+    '<input type="time" id="res-p-inicio" value="09:00" onchange="calcValorPortaria()" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div>' +
+    '<div><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Fim</label>' +
+    '<input type="time" id="res-p-fim" value="11:00" onchange="calcValorPortaria()" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div></div>' +
+    '<div style="margin-bottom:12px"><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Espacos</label>' +
+    espacosPortaria.map(e => {
+      const v = valoresPortaria[e.nome] !== undefined ? valoresPortaria[e.nome] : 105;
+      return '<div class="espaco-item-p" id="esp-p-' + e.id + '" onclick="toggleEspacoP(\'' + e.id + '\')">' +
+        '<div style="flex:1"><div style="font-weight:600;font-size:14px">' + e.nome + '</div>' +
+        '<div style="font-size:12px;color:#1a237e;font-weight:600">' + (v===0?'Gratuito':'R$ '+v+' por periodo de 2h') + '</div></div>' +
+        '<span id="chk-p-' + e.id + '">☐</span></div>';
+    }).join('') + '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+    '<div><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Num. Pessoas</label>' +
+    '<input type="number" id="res-p-pessoas" placeholder="Qtd" min="1" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div>' +
+    '<div><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Email confirmacao (opcional)</label>' +
+    '<input type="email" id="res-p-email" placeholder="email@empresa.com" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div></div>' +
+    '<div id="mat-p-section" style="display:none;margin-bottom:12px"><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Material</label>' +
+    '<div id="mat-p-info" style="font-size:12px;color:#666;margin-bottom:8px"></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+    '<div><label style="font-size:12px;color:#444;display:block;margin-bottom:4px">Cadeiras</label>' +
+    '<input type="number" id="res-p-cad" placeholder="Qtd" min="0" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div>' +
+    '<div><label style="font-size:12px;color:#444;display:block;margin-bottom:4px">Mesas</label>' +
+    '<input type="number" id="res-p-mes" placeholder="Qtd" min="0" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div></div></div>' +
+    '<div><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Observacoes (opcional)</label>' +
+    '<textarea id="res-p-obs" rows="2" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;resize:none" placeholder="Informacoes adicionais..."></textarea></div>' +
+    '<div id="val-p-box" style="display:none;background:#e8eaf6;border-radius:10px;padding:14px 16px;justify-content:space-between;align-items:center;margin:12px 0">' +
+    '<div><div style="font-size:13px;color:#666">Valor estimado</div><div style="font-size:11px;color:#999" id="val-p-det"></div></div>' +
+    '<div style="font-size:22px;font-weight:700;color:#1a237e" id="val-p-total">R$ 0,00</div></div>' +
+    '<button class="btn-verde" onclick="confirmarReservaPortaria()">✅ Confirmar Reserva</button>';
+
+  const sel = document.getElementById('res-p-sala');
+  salasCache.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.numero;
+    opt.textContent = s.numero + (s.nome_empresa ? ' — ' + s.nome_empresa : '');
+    sel.appendChild(opt);
+  });
+}
+
+function toggleEspacoP(id) {
+  const idx = espacosSelPortaria.indexOf(id);
+  if (idx > -1) espacosSelPortaria.splice(idx, 1); else espacosSelPortaria.push(id);
+  espacosPortaria.forEach(e => {
+    const el = document.getElementById('esp-p-' + e.id);
+    const chk = document.getElementById('chk-p-' + e.id);
+    if (!el) return;
+    if (espacosSelPortaria.includes(e.id)) { el.classList.add('selected'); chk.textContent = '☑'; }
+    else { el.classList.remove('selected'); chk.textContent = '☐'; }
+  });
+  atualizarMaterialPortaria(); calcValorPortaria();
+}
+
+async function atualizarMaterialPortaria() {
+  const temSala = espacosSelPortaria.some(id => { const e = espacosPortaria.find(e => e.id === id); return e && ['Sala 1','Sala 2','Sala 3'].includes(e.nome); });
+  const sec = document.getElementById('mat-p-section');
+  if (!temSala) { if (sec) sec.style.display = 'none'; return; }
+  if (sec) sec.style.display = 'block';
+  let maxCad = 0, maxMes = 0;
+  espacosSelPortaria.forEach(id => { const e = espacosPortaria.find(e => e.id === id); if (!e) return; if (['Sala 1','Sala 2'].includes(e.nome)) { maxCad+=45; maxMes+=12; } if (e.nome==='Sala 3') { maxCad+=55; maxMes+=14; } });
+  maxCad = Math.min(maxCad, 115); maxMes = Math.min(maxMes, 33);
+  const inicio = (document.getElementById('res-p-inicio')?.value||'09:00') + ':00';
+  const fim = (document.getElementById('res-p-fim')?.value||'11:00') + ':00';
+  const data = document.getElementById('res-p-data')?.value || new Date().toISOString().split('T')[0];
+  const { data: matRes } = await db.from('material_reservado').select().eq('data', data).lt('hora_inicio', fim).gt('hora_fim', inicio);
+  const cadDisp = Math.min(maxCad, 115-(matRes||[]).reduce((s,m)=>s+(m.num_cadeiras||0),0));
+  const mesDisp = Math.min(maxMes, 33-(matRes||[]).reduce((s,m)=>s+(m.num_mesas||0),0));
+  const info = document.getElementById('mat-p-info');
+  if (info) info.textContent = 'Disponivel: ' + cadDisp + ' cadeiras e ' + mesDisp + ' mesas';
+  const ci = document.getElementById('res-p-cad'); const mi = document.getElementById('res-p-mes');
+  if (ci) ci.max = cadDisp; if (mi) mi.max = mesDisp;
+}
+
+function calcValorPortaria() {
+  const ini = document.getElementById('res-p-inicio')?.value;
+  const fim = document.getElementById('res-p-fim')?.value;
+  const box = document.getElementById('val-p-box');
+  if (!ini || !fim || !espacosSelPortaria.length) { if (box) box.style.display = 'none'; return; }
+  const [hi,mi] = ini.split(':').map(Number); const [hf,mf] = fim.split(':').map(Number);
+  const dur = (hf*60+mf)-(hi*60+mi);
+  if (dur <= 0) { if (box) box.style.display = 'none'; return; }
+  const per = Math.ceil(dur/120); let total = 0; const dets = [];
+  espacosSelPortaria.forEach(id => { const e = espacosPortaria.find(e=>e.id===id); if (!e) return; if (e.nome==='Copa'){total+=50;dets.push('Copa:R$50');} else if(e.nome!=='Coffee'){const v=(valoresPortaria[e.nome]||105)*per;total+=v;dets.push(e.nome+':R$'+v.toFixed(2));} else dets.push('Coffee:Gratis'); });
+  if (box) box.style.display = 'flex';
+  const tot = document.getElementById('val-p-total'); const det = document.getElementById('val-p-det');
+  if (tot) tot.textContent = 'R$ ' + total.toFixed(2); if (det) det.textContent = dets.join(' | ');
+}
+
+async function confirmarReservaPortaria() {
+  const data = document.getElementById('res-p-data')?.value;
+  const inicio = (document.getElementById('res-p-inicio')?.value||'') + ':00';
+  const fim = (document.getElementById('res-p-fim')?.value||'') + ':00';
+  const responsavel = document.getElementById('res-p-resp')?.value?.trim();
+  const salaNum = document.getElementById('res-p-sala')?.value;
+  const pessoas = document.getElementById('res-p-pessoas')?.value;
+  const obs = document.getElementById('res-p-obs')?.value?.trim();
+  const email = document.getElementById('res-p-email')?.value?.trim();
+  const erroEl = document.getElementById('erro-res-p');
+  const sucEl = document.getElementById('suc-res-p');
+  erroEl.style.display = 'none'; sucEl.style.display = 'none';
+
+  if (!data || !responsavel) { erroEl.textContent = 'Preencha data e responsavel.'; erroEl.style.display = 'block'; return; }
+  if (!espacosSelPortaria.length) { erroEl.textContent = 'Selecione pelo menos um espaco.'; erroEl.style.display = 'block'; return; }
+  if (inicio >= fim) { erroEl.textContent = 'Horario de fim deve ser maior que inicio.'; erroEl.style.display = 'block'; return; }
+
+  const [h,m] = fim.split(':').map(Number);
+  const fimInt = String(Math.min(h+1,23)).padStart(2,'0')+':'+String(m).padStart(2,'0')+':00';
+  const { data: conf } = await db.from('reservas').select().eq('data', data).lt('hora_inicio', fimInt).gt('hora_fim', inicio);
+  if ((conf||[]).some(r=>(r.espaco_ids||[]).some(id=>espacosSelPortaria.includes(id)))) { erroEl.textContent = 'Conflito de horario (incluindo 1h de limpeza).'; erroEl.style.display = 'block'; return; }
+
+  const ci = document.getElementById('res-p-cad'); const mi = document.getElementById('res-p-mes');
+  const cad = parseInt(ci?.value||0)||0; const mes = parseInt(mi?.value||0)||0;
+  if (cad > parseInt(ci?.max||999)) { erroEl.textContent = '⚠️ Limite de cadeiras excedido! Max: ' + ci.max; erroEl.style.display = 'block'; return; }
+  if (mes > parseInt(mi?.max||999)) { erroEl.textContent = '⚠️ Limite de mesas excedido! Max: ' + mi.max; erroEl.style.display = 'block'; return; }
+
+  const [hi,mii] = inicio.split(':').map(Number); const [hf,mf] = fim.split(':').map(Number);
+  const per = Math.ceil(((hf*60+mf)-(hi*60+mii))/120); let total = 0;
+  espacosSelPortaria.forEach(id => { const e = espacosPortaria.find(e=>e.id===id); if (!e) return; if(e.nome==='Copa')total+=50; else if(e.nome!=='Coffee')total+=(valoresPortaria[e.nome]||105)*per; });
+
+  let salaId = null, salaObj = null;
+  if (salaNum) { const { data: s } = await db.from('salas').select().eq('numero', salaNum).single(); salaId = s?.id||null; salaObj = s; }
+
+  const { data: reserva, error } = await db.from('reservas').insert({
+    espaco_ids: espacosSelPortaria, data, hora_inicio: inicio, hora_fim: fim,
+    responsavel_nome: responsavel, sala_id: salaId, num_pessoas: parseInt(pessoas)||null,
+    valor_total: total, observacoes: obs||null, num_cadeiras: cad, num_mesas: mes,
+  }).select('id').single();
+
+  if (error) { erroEl.textContent = 'Erro: ' + error.message; erroEl.style.display = 'block'; return; }
+  if (cad > 0 || mes > 0) await db.from('material_reservado').insert({ reserva_id: reserva.id, data, hora_inicio: inicio, hora_fim: fim, num_cadeiras: cad, num_mesas: mes });
+
+  const nomesEsp = espacosSelPortaria.map(id=>{const e=espacosPortaria.find(e=>e.id===id);return e?e.nome:id;}).join(' + ');
+  await enviarEmailReserva({ email: email||null, sala_numero: salaNum||'Portaria', sala_empresa: salaObj?.nome_empresa||null, responsavel, data, hora_inicio: inicio, hora_fim: fim, espacos: nomesEsp, valor_total: total, observacoes: obs||null });
+
+  espacosSelPortaria = [];
+  sucEl.textContent = '✅ Reserva confirmada! Valor: R$ ' + total.toFixed(2) + (email?' — Email enviado para '+email:'');
+  sucEl.style.display = 'block';
+  carregarReservas();
+  renderizarFormPortaria();
 }
 
 document.getElementById('senha').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });

@@ -628,8 +628,24 @@ async function confirmarReserva() {
     await db.from('material_reservado').insert({ reserva_id: reserva.id, data, hora_inicio: inicio, hora_fim: fim, num_cadeiras: cadeiras, num_mesas: mesas });
   }
 
+  // Envia email de confirmacao
+  const email = document.getElementById('res-email')?.value?.trim();
+  const nomesEsp = espacosSelecionados.map(id => { const e = espacosCache.find(e => e.id === id); return e ? e.nome : id; }).join(' + ');
+  await enviarEmailReserva({
+    email: email || null,
+    sala_numero: salaAtual.numero,
+    sala_empresa: salaAtual.nome_empresa || null,
+    responsavel,
+    data,
+    hora_inicio: inicio,
+    hora_fim: fim,
+    espacos: nomesEsp,
+    valor_total: total,
+    observacoes: obs || null,
+  });
+
   espacosSelecionados = [];
-  sucessoEl.textContent = '✅ Reserva confirmada! Valor a ser cobrado: R$ ' + total.toFixed(2);
+  sucessoEl.textContent = '✅ Reserva confirmada! Valor a ser cobrado: R$ ' + total.toFixed(2) + (email ? ' — Confirmacao enviada para ' + email : '');
   sucessoEl.style.display = 'block';
   window.scrollTo(0, 0);
   carregarReservas();
@@ -650,6 +666,17 @@ const salaSalva = localStorage.getItem('ar3000_sala');
 if (salaSalva) {
   salaAtual = JSON.parse(salaSalva);
   mostrarDashboard();
+}
+
+
+async function enviarEmailReserva(dados) {
+  try {
+    await fetch('https://aatpmxexgrtknnafjhqu.supabase.co/functions/v1/enviar-email-reserva', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhdHBteGV4Z3J0a25uYWZqaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNDkyNzIsImV4cCI6MjA4ODkyNTI3Mn0.ugx_4mE_ZSz7FE0rwOvsw5R4Psg27hefsG0TTIEYDbc' },
+      body: JSON.stringify(dados)
+    });
+  } catch(e) { console.error('Erro ao enviar email:', e); }
 }
 
 document.getElementById('sala-senha').addEventListener('keydown', e => { if (e.key === 'Enter') loginSala(); });
