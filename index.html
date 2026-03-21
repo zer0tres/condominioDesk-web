@@ -819,8 +819,148 @@ async function gerarPDFConvidados(reserva) {
   doc.save('convidados-' + reserva.data + '.pdf');
 }
 
+let reservaEditPortaria = null;
+let espacosEditPortaria = [];
+let editConvPCount = 0;
+
+async function abrirEdicaoPortaria(reservaId) {
+  const { data: r } = await db.from('reservas').select('*, salas(numero, nome_empresa)').eq('id', reservaId).single();
+  if (!r) return;
+  reservaEditPortaria = r;
+  espacosEditPortaria = [...(r.espaco_ids || [])];
+
+  const dataFmt = new Date(r.data+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('edit-p-title').textContent = 'Editar Reserva — ' + dataFmt;
+  document.getElementById('edit-p-inicio').value = r.hora_inicio.substring(0,5);
+  document.getElementById('edit-p-fim').value = r.hora_fim.substring(0,5);
+  document.getElementById('edit-p-pessoas').value = r.num_pessoas || '';
+  document.getElementById('edit-p-obs').value = r.observacoes || '';
+  document.getElementById('edit-p-resp').value = r.responsavel_nome || '';
+
+  let htmlEsp = '';
+  espacosCache.forEach(e => {
+    const sel = espacosEditPortaria.includes(e.id);
+    htmlEsp += '<div class="espaco-item-p' + (sel?' selected':'') + '" id="edit-p-esp-'+e.id+'" onclick="toggleEditEspacoP(\''+e.id+'\')">' +
+      '<div style="flex:1"><div style="font-weight:600;font-size:14px">'+e.nome+'</div></div>' +
+      '<span id="edit-p-chk-'+e.id+'">'+(sel?'☑':'☐')+'</span></div>';
+  });
+  document.getElementById('edit-p-espacos').innerHTML = htmlEsp;
+
+  const convContainer = document.getElementById('edit-p-conv-lista');
+  convContainer.innerHTML = '';
+  editConvPCount = 0;
+  (r.convidados || []).forEach(c => adicionarConvidadoEditP(c.nome, c.documento));
+
+  document.getElementById('modal-edit-portaria').classList.add('open');
+}
+
+function adicionarConvidadoEditP(nome='', doc='') {
+  editConvPCount++;
+  const id = editConvPCount;
+  const div = document.createElement('div');
+  div.id = 'editcp-' + id;
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
+  div.innerHTML = '<input type="text" value="'+nome+'" placeholder="Nome completo" style="padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px" id="editcp-nome-'+id+'">' +
+    '<input type="text" value="'+doc+'" placeholder="RG/CPF" style="padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px" id="editcp-doc-'+id+'">' +
+    '<button onclick="document.getElementById(\'editcp-\'+'+id+').remove()" style="padding:8px 12px;background:none;color:#e53935;border:1px solid #e53935;border-radius:8px;cursor:pointer">✕</button>';
+  document.getElementById('edit-p-conv-lista').appendChild(div);
+}
+
+function toggleEditEspacoP(id) {
+  const idx = espacosEditPortaria.indexOf(id);
+  if (idx > -1) espacosEditPortaria.splice(idx, 1); else espacosEditPortaria.push(id);
+  espacosCache.forEach(e => {
+    const el = document.getElementById('edit-p-esp-'+e.id);
+    const chk = document.getElementById('edit-p-chk-'+e.id);
+    if (!el) return;
+    if (espacosEditPortaria.includes(e.id)) { el.classList.add('selected'); chk.textContent='☑'; }
+    else { el.classList.remove('selected'); chk.textContent='☐'; }
+  });
+}
+
+function coletarConvidadosEditP() {
+  const lista = [];
+  document.querySelectorAll('[id^="editcp-nome-"]').forEach(input => {
+    const id = input.id.replace('editcp-nome-','');
+    const nome = input.value.trim();
+    const doc = document.getElementById('editcp-doc-'+id)?.value?.trim()||'';
+    if (nome) lista.push({nome, documento:doc});
+  });
+  return lista;
+}
+
+async function salvarEdicaoPortaria() {
+  const inicio = document.getElementById('edit-p-inicio').value + ':00';
+  const fim = document.getElementById('edit-p-fim').value + ':00';
+  const pessoas = document.getElementById('edit-p-pessoas').value;
+  const obs = document.getElementById('edit-p-obs').value.trim();
+  const resp = document.getElementById('edit-p-resp').value.trim();
+  const erroEl = document.getElementById('edit-p-erro');
+  erroEl.style.display = 'none';
+
+  if (!inicio || !fim || inicio >= fim) { erroEl.textContent='Horario invalido.'; erroEl.style.display='block'; return; }
+  if (!espacosEditPortaria.length) { erroEl.textContent='Selecione pelo menos um espaco.'; erroEl.style.display='block'; return; }
+  if (!resp) { erroEl.textContent='Informe o responsavel.'; erroEl.style.display='block'; return; }
+
+  const fimInt = (() => { const [h,m]=fim.split(':').map(Number); return String(Math.min(h+1,23)).padStart(2,'0')+':'+String(m).padStart(2,'0')+':00'; })();
+  const { data: conf } = await db.from('reservas').select().eq('data', reservaEditPortaria.data).lt('hora_inicio', fimInt).gt('hora_fim', inicio).neq('id', reservaEditPortaria.id);
+  if ((conf||[]).some(r=>(r.espaco_ids||[]).some(id=>espacosEditPortaria.includes(id)))) {
+    erroEl.textContent='Conflito de horario com outra reserva.'; erroEl.style.display='block'; return;
+  }
+
+  const [hi,mi]=inicio.split(':').map(Number); const [hf,mf]=fim.split(':').map(Number);
+  const per = Math.ceil(((hf*60+mf)-(hi*60+mi))/120);
+  const valP = {'Sala 1':105,'Sala 2':105,'Sala 3':150,'Sala de Reunioes':105,'Copa':50,'Coffee':0};
+  let total = 0;
+  espacosEditPortaria.forEach(id => { const e=espacosCache.find(e=>e.id===id); if(!e)return; if(e.nome==='Copa')total+=50; else if(e.nome!=='Coffee')total+=(valP[e.nome]||105)*per; });
+
+  await db.from('reservas').update({
+    espaco_ids: espacosEditPortaria,
+    hora_inicio: inicio, hora_fim: fim,
+    responsavel_nome: resp,
+    num_pessoas: parseInt(pessoas)||null,
+    observacoes: obs||null,
+    valor_total: total,
+    convidados: coletarConvidadosEditP(),
+  }).eq('id', reservaEditPortaria.id);
+
+  fecharModalEditPortaria();
+  carregarReservas();
+}
+
+function fecharModalEditPortaria() {
+  document.getElementById('modal-edit-portaria').classList.remove('open');
+  reservaEditPortaria = null;
+}
+
 document.getElementById('senha').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 db.auth.getSession().then(({ data }) => { if (data.session) mostrarDashboard(); });
 </script>
+
+<div class="modal-reserva" id="modal-edit-portaria">
+  <div class="modal-card" style="max-width:650px">
+    <h2 id="edit-p-title">Editar Reserva</h2>
+    <div id="edit-p-erro" style="display:none;color:#e53935;font-size:13px;padding:10px 14px;background:#ffebee;border-radius:8px;margin-bottom:12px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Responsavel</label>
+        <input type="text" id="edit-p-resp" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div>
+      <div><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Inicio</label>
+        <input type="time" id="edit-p-inicio" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div>
+      <div><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Fim</label>
+        <input type="time" id="edit-p-fim" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div>
+    </div>
+    <div style="margin-bottom:12px"><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Espacos (portaria pode remover qualquer espaco)</label>
+      <div id="edit-p-espacos"></div></div>
+    <div style="margin-bottom:12px"><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Num. Pessoas</label>
+      <input type="number" id="edit-p-pessoas" min="1" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px"></div>
+    <div style="margin-bottom:12px"><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Observacoes</label>
+      <textarea id="edit-p-obs" rows="2" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;resize:none"></textarea></div>
+    <div style="margin-bottom:12px"><label style="font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px">Lista de Convidados</label>
+      <div id="edit-p-conv-lista"></div>
+      <button type="button" onclick="adicionarConvidadoEditP()" style="margin-top:8px;padding:8px 16px;background:white;color:#1a237e;border:1.5px solid #1a237e;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">+ Adicionar Convidado</button></div>
+    <button style="width:100%;padding:14px;background:#1a237e;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px" onclick="salvarEdicaoPortaria()">💾 Salvar Alteracoes</button>
+    <button style="width:100%;padding:12px;background:white;color:#666;border:1.5px solid #e0e0e0;border-radius:10px;font-size:14px;cursor:pointer;margin-top:8px" onclick="fecharModalEditPortaria()">Cancelar</button>
+  </div>
+</div>
 </body>
 </html>
