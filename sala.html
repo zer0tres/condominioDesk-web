@@ -585,12 +585,29 @@ async function confirmarReserva() {
     else if (e.nome !== 'Coffee') total += (valoresPor2h[e.nome] || 105) * periodos;
   });
 
-  const cadeiras = parseInt(document.getElementById('res-cadeiras')?.value || 0) || 0;
-  const mesas = parseInt(document.getElementById('res-mesas')?.value || 0) || 0;
-  const maxCadInput = parseInt(document.getElementById('res-cadeiras')?.max || 999);
-  const maxMesInput = parseInt(document.getElementById('res-mesas')?.max || 999);
-  if (cadeiras > maxCadInput) { erroEl.textContent = 'Quantidade de cadeiras excede o limite disponivel (' + maxCadInput + ').'; erroEl.style.display = 'block'; return; }
-  if (mesas > maxMesInput) { erroEl.textContent = 'Quantidade de mesas excede o limite disponivel (' + maxMesInput + ').'; erroEl.style.display = 'block'; return; }
+  const cadInput = document.getElementById('res-cadeiras');
+  const mesInput = document.getElementById('res-mesas');
+  const cadeiras = parseInt(cadInput?.value || 0) || 0;
+  const mesas = parseInt(mesInput?.value || 0) || 0;
+
+  // Valida limites de material
+  const matVisivel = document.getElementById('material-section')?.style.display !== 'none';
+  if (matVisivel || cadeiras > 0 || mesas > 0) {
+    const maxCad = parseInt(cadInput?.max || 0);
+    const maxMes = parseInt(mesInput?.max || 0);
+    if (cadeiras > maxCad) {
+      erroEl.textContent = '⚠️ Limite de cadeiras excedido! Maximo disponivel: ' + maxCad + ' cadeiras. Voce tentou reservar: ' + cadeiras + '.';
+      erroEl.style.display = 'block';
+      if (cadInput) { cadInput.style.borderColor = '#e53935'; cadInput.focus(); }
+      return;
+    }
+    if (mesas > maxMes) {
+      erroEl.textContent = '⚠️ Limite de mesas excedido! Maximo disponivel: ' + maxMes + ' mesas. Voce tentou reservar: ' + mesas + '.';
+      erroEl.style.display = 'block';
+      if (mesInput) { mesInput.style.borderColor = '#e53935'; mesInput.focus(); }
+      return;
+    }
+  }
 
   const { data: reserva, error } = await db.from('reservas').insert({
     espaco_ids: espacosSelecionados,
