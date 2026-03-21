@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR3000 — Acesso da Sala</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; }
+    #login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #00695c; }
+    .login-card { background: white; border-radius: 16px; padding: 48px 40px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; }
+    .login-card img { height: 80px; margin-bottom: 16px; }
+    .login-card h1 { font-size: 22px; color: #00695c; margin-bottom: 4px; }
+    .login-card p { color: #666; margin-bottom: 28px; font-size: 14px; }
+    .login-card input { width: 100%; padding: 14px 16px; border: 1.5px solid #e0e0e0; border-radius: 10px; font-size: 15px; margin-bottom: 12px; outline: none; text-align: center; }
+    .login-card input:focus { border-color: #00695c; }
+    .btn-primary { width: 100%; padding: 14px; background: #00695c; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; }
+    .btn-primary:hover { background: #00796b; }
+    .erro { color: #e53935; font-size: 13px; margin-top: 8px; }
+    .senha-toggle { position: relative; }
+    .senha-toggle input { padding-right: 48px; }
+    .senha-toggle button { position: absolute; right: 12px; top: 50%; transform: translateY(-60%); background: none; border: none; cursor: pointer; color: #999; font-size: 18px; }
+    #dashboard { display: none; }
+    .topbar { background: #00695c; color: white; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+    .topbar-left img { height: 32px; }
+    .topbar-info { display: flex; flex-direction: column; }
+    .topbar-sala { font-weight: 700; font-size: 16px; }
+    .topbar-empresa { font-size: 12px; color: rgba(255,255,255,0.7); }
+    .btn-logout { padding: 8px 16px; background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .tabs { display: flex; background: white; border-bottom: 2px solid #e0e0e0; padding: 0 24px; overflow-x: auto; }
+    .tab { padding: 14px 20px; cursor: pointer; font-weight: 600; color: #666; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; font-size: 14px; }
+    .tab.active { color: #00695c; border-bottom-color: #00695c; }
+    .content { padding: 20px 24px; max-width: 900px; margin: 0 auto; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .section-title { font-size: 17px; font-weight: 700; color: #00695c; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .badge { background: #00695c; color: white; border-radius: 12px; padding: 2px 10px; font-size: 12px; }
+    .badge.orange { background: #f57c00; }
+    .badge.green { background: #2e7d32; }
+    .card { background: white; border-radius: 12px; padding: 16px 20px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-left: 4px solid #00695c; }
+    .card.pendente { border-left-color: #f57c00; }
+    .card.retirada { border-left-color: #2e7d32; }
+    .card.reserva-hoje { background: #e8f5e9; border-left-color: #00695c; }
+    .card-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+    .card-sub { color: #666; font-size: 13px; margin-bottom: 2px; }
+    .chip { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .chip.pendente { background: #fff3e0; color: #f57c00; }
+    .chip.retirada { background: #e8f5e9; color: #2e7d32; }
+    .chip.hoje { background: #e0f2f1; color: #00695c; }
+    .data-header { background: #e0f2f1; color: #00695c; font-weight: 700; font-size: 12px; padding: 6px 14px; border-radius: 20px; margin: 12px 0 6px; display: inline-block; }
+    .data-header.hoje { background: #00695c; color: white; }
+    .foto-thumb { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-top: 10px; cursor: pointer; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal-overlay img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+    .modal-close { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; }
+    .modal-reserva { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 20px; }
+    .modal-reserva.open { display: flex; }
+    .modal-card { background: white; border-radius: 16px; padding: 24px; width: 100%; max-width: 600px; margin: auto; }
+    .modal-card h2 { color: #00695c; margin-bottom: 20px; font-size: 18px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 14px; border: 1.5px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none; }
+    .form-group input:focus, .form-group select:focus { border-color: #00695c; }
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .espaco-item { padding: 12px 16px; border: 1.5px solid #e0e0e0; border-radius: 10px; cursor: pointer; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; transition: all 0.15s; }
+    .espaco-item.selected { border-color: #00695c; background: #e0f2f1; }
+    .espaco-item.blocked { opacity: 0.4; cursor: not-allowed; background: #f5f5f5; }
+    .espaco-nome { font-weight: 600; font-size: 14px; }
+    .espaco-valor { font-size: 12px; color: #00695c; font-weight: 600; }
+    .espaco-valor.gratis { color: #2e7d32; }
+    .valor-box { background: #e0f2f1; border-radius: 10px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; margin: 16px 0; }
+    .valor-total { font-size: 22px; font-weight: 700; color: #00695c; }
+    .btn-confirmar { width: 100%; padding: 14px; background: #00695c; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    .btn-confirmar:hover { background: #00796b; }
+    .btn-confirmar:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-cancelar { width: 100%; padding: 12px; background: white; color: #666; border: 1.5px solid #e0e0e0; border-radius: 10px; font-size: 14px; cursor: pointer; margin-top: 8px; }
+    .btn-nova-reserva { padding: 12px 20px; background: #00695c; color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-top: 8px; }
+    .info-item { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; }
+    .info-label { color: #999; font-size: 11px; }
+    .info-value { font-weight: 600; font-size: 13px; }
+    .empty { text-align: center; padding: 40px; color: #999; }
+    .empty .icon { font-size: 40px; margin-bottom: 10px; }
+    .loading { text-align: center; padding: 40px; color: #666; }
+    .spinner { width: 36px; height: 36px; border: 4px solid #e0e0e0; border-top-color: #00695c; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .periodo-info { background: #e3f2fd; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #1565c0; margin-top: 8px; }
+    .erro-form { color: #e53935; font-size: 13px; padding: 10px 14px; background: #ffebee; border-radius: 8px; margin-bottom: 12px; }
+    .sucesso-form { color: #2e7d32; font-size: 13px; padding: 10px 14px; background: #e8f5e9; border-radius: 8px; margin-bottom: 12px; }
+    .btn-cancelar-reserva { font-size: 12px; color: #e53935; background: none; border: 1px solid #e53935; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+    .btn-cancelar-reserva:disabled { color: #ccc; border-color: #ccc; cursor: not-allowed; }
+    .aviso-48h { font-size: 11px; color: #f57c00; margin-top: 4px; }
+    .filtro-row { display: flex; gap: 8px; margin-bottom: 16px; }
+    .filtro-btn { padding: 8px 16px; border-radius: 20px; border: 1.5px solid; font-size: 13px; font-weight: 600; cursor: pointer; background: white; }
+    .filtro-btn.active-orange { background: #f57c00; color: white; border-color: #f57c00; }
+    .filtro-btn.active-green { background: #2e7d32; color: white; border-color: #2e7d32; }
+    .filtro-btn:not(.active-orange):not(.active-green) { color: #666; border-color: #ddd; }
+    @media (max-width: 600px) { .content { padding: 16px; } .form-row-2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <img src="nov(2).png" alt="AR3000" onerror="this.style.display='none'">
+    <h1>AR3000</h1>
+    <p>Cabral Corporate &amp; Offices — Acesso da Sala</p>
+    <input type="number" id="sala-numero" placeholder="Número da sala (ex: 401)" style="font-size:18px;font-weight:700;letter-spacing:4px">
+    <div class="senha-toggle">
+      <input type="password" id="sala-senha" placeholder="Senha">
+      <button onclick="toggleSenha()">👁</button>
+    </div>
+    <button class="btn-primary" onclick="loginSala()">Entrar</button>
+    <p class="erro" id="erro-login"></p>
+  </div>
+</div>
+
+<div id="dashboard">
+  <div class="topbar">
+    <div class="topbar-left">
+      <img src="nov(2).png" alt="AR3000" onerror="this.style.display='none'">
+      <div class="topbar-info">
+        <span class="topbar-sala" id="topbar-sala">Sala —</span>
+        <span class="topbar-empresa" id="topbar-empresa">AR3000</span>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logoutSala()">Sair</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="mudarTab('encomendas')">📦 Encomendas</div>
+    <div class="tab" onclick="mudarTab('reservas')">🗓️ Minhas Reservas</div>
+    <div class="tab" onclick="mudarTab('nova-reserva')">➕ Nova Reserva</div>
+  </div>
+
+  <div class="content">
+
+    <div id="tab-encomendas" class="tab-content active">
+      <div class="section-title">📦 Encomendas <span class="badge orange" id="badge-pendentes">0</span></div>
+      <div class="filtro-row">
+        <button class="filtro-btn active-orange" id="filtro-pendente" onclick="setFiltro('pendente')">Pendentes</button>
+        <button class="filtro-btn" id="filtro-retirada" onclick="setFiltro('retirada')">Retiradas</button>
+      </div>
+      <div id="encomendas-content" class="loading"><div class="spinner"></div>Carregando...</div>
+    </div>
+
+    <div id="tab-reservas" class="tab-content">
+      <div class="section-title">🗓️ Minhas Reservas</div>
+      <div id="reservas-content" class="loading"><div class="spinner"></div>Carregando...</div>
+    </div>
+
+    <div id="tab-nova-reserva" class="tab-content">
+      <div class="section-title">➕ Nova Reserva</div>
+      <div id="nova-reserva-content" class="loading"><div class="spinner"></div>Carregando espacos...</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-foto" onclick="fecharFoto()">
+  <button class="modal-close" onclick="fecharFoto()">✕</button>
+  <img id="modal-img" src="" alt="Foto">
+</div>
+
+<script>
+const SUPABASE_URL = 'https://aatpmxexgrtknnafjhqu.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhdHBteGV4Z3J0a25uYWZqaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNDkyNzIsImV4cCI6MjA4ODkyNTI3Mn0.ugx_4mE_ZSz7FE0rwOvsw5R4Psg27hefsG0TTIEYDbc';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let salaAtual = null;
+let espacosCache = [];
+let espacosSelecionados = [];
+let filtroAtual = 'pendente';
+
+const valoresPor2h = { 'Sala 1': 105, 'Sala 2': 105, 'Sala 3': 150, 'Sala de Reunioes': 105, 'Copa': 50, 'Coffee': 0 };
+
+function toggleSenha() {
+  const input = document.getElementById('sala-senha');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+async function loginSala() {
+  const numero = document.getElementById('sala-numero').value.trim();
+  const senha = document.getElementById('sala-senha').value.trim();
+  const erroEl = document.getElementById('erro-login');
+  erroEl.textContent = '';
+
+  if (!numero || !senha) { erroEl.textContent = 'Preencha todos os campos.'; return; }
+
+  const n = parseInt(numero);
+  const valido = numero === '000' || (n >= 401 && n <= 2510 && (n % 100) >= 1 && (n % 100) <= 10);
+  if (!valido) { erroEl.textContent = 'Numero de sala invalido.'; return; }
+
+  const { data: sala } = await db.from('salas').select().eq('numero', numero).eq('senha', senha).maybeSingle();
+  if (!sala) { erroEl.textContent = 'Numero ou senha incorretos.'; return; }
+
+  // Primeiro acesso
+  if (sala.senha === 'sala' + numero) {
+    const nova = prompt('Primeiro acesso! Crie sua nova senha (minimo 4 caracteres):');
+    if (!nova || nova.length < 4) { erroEl.textContent = 'Senha invalida.'; return; }
+    const confirma = prompt('Confirme sua nova senha:');
+    if (nova !== confirma) { erroEl.textContent = 'As senhas nao coincidem.'; return; }
+    await db.from('salas').update({ senha: nova }).eq('id', sala.id);
+    sala.senha = nova;
+  }
+
+  salaAtual = sala;
+  localStorage.setItem('ar3000_sala', JSON.stringify(sala));
+  mostrarDashboard();
+}
+
+function logoutSala() {
+  salaAtual = null;
+  localStorage.removeItem('ar3000_sala');
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function mostrarDashboard() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('topbar-sala').textContent = 'Sala ' + salaAtual.numero;
+  document.getElementById('topbar-empresa').textContent = salaAtual.nome_empresa || 'AR3000 — Cabral Corporate & Offices';
+  carregarEncomendas();
+  carregarReservas();
+  carregarEspacos();
+}
+
+function mudarTab(tab) {
+  const tabs = ['encomendas','reservas','nova-reserva'];
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', tabs[i]===tab));
+  tabs.forEach(t => { const el = document.getElementById('tab-'+t); if(el) el.classList.toggle('active', t===tab); });
+}
+
+function setFiltro(f) {
+  filtroAtual = f;
+  document.getElementById('filtro-pendente').className = 'filtro-btn' + (f==='pendente' ? ' active-orange' : '');
+  document.getElementById('filtro-retirada').className = 'filtro-btn' + (f==='retirada' ? ' active-green' : '');
+  carregarEncomendas();
+}
+
+async function carregarEncomendas() {
+  if (!salaAtual) return;
+  document.getElementById('encomendas-content').innerHTML = '<div class="loading"><div class="spinner"></div>Carregando...</div>';
+
+  const { data } = await db.from('encomendas').select().eq('sala_id', salaAtual.id).eq('status', filtroAtual).order('criado_em', { ascending: false });
+  const encomendas = data || [];
+
+  const pendentes = await db.from('encomendas').select('id', { count: 'exact' }).eq('sala_id', salaAtual.id).eq('status', 'pendente');
+  document.getElementById('badge-pendentes').textContent = pendentes.count || 0;
+
+  const el = document.getElementById('encomendas-content');
+  if (!encomendas.length) {
+    el.innerHTML = '<div class="empty"><div class="icon">' + (filtroAtual==='pendente'?'📭':'✅') + '</div>' + (filtroAtual==='pendente'?'Nenhuma encomenda pendente':'Nenhuma encomenda retirada') + '</div>';
+    return;
+  }
+
+  let html = '';
+  encomendas.forEach(e => {
+    html += '<div class="card ' + e.status + '">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+      '<div>' +
+      '<div class="card-title">' + e.nome_destinatario + '</div>' +
+      (e.codigo_rastreio ? '<div class="card-sub">📦 ' + e.codigo_rastreio + '</div>' : '') +
+      '<div class="card-sub">⏰ Chegou: ' + new Date(e.criado_em).toLocaleString('pt-BR') + '</div>' +
+      (e.retirado_em ? '<div class="card-sub" style="color:#2e7d32">✅ Retirado: ' + new Date(e.retirado_em).toLocaleString('pt-BR') + '</div>' : '') +
+      (e.retirado_por ? '<div class="card-sub" style="color:#2e7d32">👤 Por: ' + e.retirado_por + '</div>' : '') +
+      '</div>' +
+      '<span class="chip ' + e.status + '">' + (e.status==='pendente'?'Pendente':'Retirada') + '</span>' +
+      '</div>' +
+      (e.foto_url ? '<img class="foto-thumb" src="' + e.foto_url + '" onclick="abrirFoto(\'' + e.foto_url + '\')">' : '') +
+      '</div>';
+  });
+  el.innerHTML = html;
+}
+
+async function carregarReservas() {
+  if (!salaAtual) return;
+  const hoje = new Date().toISOString().split('T')[0];
+  const { data } = await db.from('reservas').select().eq('sala_id', salaAtual.id).gte('data', hoje).order('data').order('hora_inicio');
+  const reservas = data || [];
+
+  const el = document.getElementById('reservas-content');
+  if (!reservas.length) {
+    el.innerHTML = '<div class="empty"><div class="icon">📅</div>Nenhuma reserva proxima</div>';
+    return;
+  }
+
+  const isHoje = d => d === hoje;
+  let html = '';
+  reservas.forEach(r => {
+    const data48h = new Date(r.data + 'T' + r.hora_inicio);
+    data48h.setHours(data48h.getHours() - 48);
+    const podeCancelar = new Date() < data48h;
+    const nomesEspacos = (r.espaco_ids || []).map(id => { const e = espacosCache.find(e => e.id === id); return e ? e.nome : id; }).join(' + ');
+
+    html += '<div class="card ' + (isHoje(r.data) ? 'reserva-hoje' : '') + '">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+      '<div>' +
+      '<div class="card-title">' + nomesEspacos + '</div>' +
+      '<div class="card-sub">📅 ' + new Date(r.data+'T12:00:00').toLocaleDateString('pt-BR', {weekday:'short',day:'numeric',month:'short'}) + '</div>' +
+      '<div class="card-sub">🕐 ' + r.hora_inicio.substring(0,5) + ' — ' + r.hora_fim.substring(0,5) + '</div>' +
+      '<div class="card-sub">👤 ' + r.responsavel_nome + '</div>' +
+      (r.valor_total ? '<div class="card-sub" style="color:#00695c;font-weight:600">💰 R$ ' + parseFloat(r.valor_total).toFixed(2) + '</div>' : '') +
+      '</div>' +
+      (isHoje(r.data) ? '<span class="chip hoje">Hoje</span>' : '') +
+      '</div>' +
+      '<div style="margin-top:10px">' +
+      '<button class="btn-cancelar-reserva" ' + (!podeCancelar ? 'disabled title="Prazo de 48h encerrado"' : '') + ' onclick="cancelarReserva(\'' + r.id + '\',this)">' +
+      (podeCancelar ? '🗑️ Cancelar' : '⏰ Prazo encerrado') + '</button>' +
+      (!podeCancelar ? '<div class="aviso-48h">Cancelamento deve ser feito com 48h de antecedencia</div>' : '') +
+      '</div>' +
+      '</div>';
+  });
+  el.innerHTML = html;
+}
+
+async function cancelarReserva(id, btn) {
+  if (!confirm('Cancelar esta reserva?')) return;
+  btn.disabled = true;
+  await db.from('reservas').delete().eq('id', id);
+  carregarReservas();
+}
+
+async function carregarEspacos() {
+  const { data } = await db.from('espacos_comuns').select();
+  espacosCache = data || [];
+  renderizarFormReserva();
+}
+
+async function renderizarFormReserva() {
+  if (!salaAtual) return;
+
+  // Verifica Copa/Coffee ocupados hoje por outra sala
+  const hoje = new Date().toISOString().split('T')[0];
+  const { data: reservasHoje } = await db.from('reservas').select('espaco_ids, sala_id').eq('data', hoje);
+  const copaOcupada = (reservasHoje || []).some(r => r.sala_id !== salaAtual.id && (r.espaco_ids || []).some(id => espacosCache.find(e => e.id === id && e.nome === 'Copa')));
+  const coffeeOcupado = (reservasHoje || []).some(r => r.sala_id !== salaAtual.id && (r.espaco_ids || []).some(id => espacosCache.find(e => e.id === id && e.nome === 'Coffee')));
+
+  const el = document.getElementById('nova-reserva-content');
+  el.innerHTML = `
+    <div id="erro-reserva" class="erro-form" style="display:none"></div>
+    <div id="sucesso-reserva" class="sucesso-form" style="display:none"></div>
+
+    <div class="form-row-2">
+      <div class="form-group">
+        <label>Data</label>
+        <input type="date" id="res-data" min="${hoje}" value="${hoje}">
+      </div>
+      <div class="form-group">
+        <label>Responsavel</label>
+        <input type="text" id="res-responsavel" placeholder="Nome do responsavel">
+      </div>
+    </div>
+
+    <div class="form-row-2">
+      <div class="form-group">
+        <label>Horario de Inicio</label>
+        <input type="time" id="res-inicio" value="09:00">
+      </div>
+      <div class="form-group">
+        <label>Horario de Fim</label>
+        <input type="time" id="res-fim" value="11:00">
+      </div>
+    </div>
+    <div class="periodo-info" id="periodo-info">Duracao: 2h = 1 periodo de 2h</div>
+
+    <div class="form-group" style="margin-top:16px">
+      <label>Espacos</label>
+      <div id="espacos-lista">
+        ${espacosCache.map(e => {
+          const bloqueado = (e.nome === 'Copa' && copaOcupada) || (e.nome === 'Coffee' && coffeeOcupado);
+          const valor = valoresPor2h[e.nome] !== undefined ? valoresPor2h[e.nome] : 105;
+          return '<div class="espaco-item' + (bloqueado ? ' blocked' : '') + '" id="esp-' + e.id + '" onclick="toggleEspaco(\'' + e.id + '\',\'' + e.nome + '\',' + bloqueado + ')">' +
+            '<div style="flex:1">' +
+            '<div class="espaco-nome">' + e.nome + '</div>' +
+            '<div class="espaco-valor' + (valor===0?' gratis':'') + '">' + (bloqueado ? 'Ja reservado hoje por outra sala' : valor === 0 ? 'Gratuito' : 'R$ ' + valor + ' por periodo de 2h') + '</div>' +
+            '</div>' +
+            '<span id="check-' + e.id + '">☐</span>' +
+            '</div>';
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="form-row-2">
+      <div class="form-group">
+        <label>Numero de Pessoas</label>
+        <input type="number" id="res-pessoas" placeholder="Qtd" min="1">
+      </div>
+      <div class="form-group">
+        <label>Email para confirmacao (opcional)</label>
+        <input type="email" id="res-email" placeholder="email@empresa.com">
+      </div>
+    </div>
+
+    <div id="material-section" style="display:none">
+      <div class="form-group">
+        <label>Material necessario (opcional)</label>
+        <div id="material-info" style="font-size:12px;color:#666;margin-bottom:8px"></div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Cadeiras</label>
+            <input type="number" id="res-cadeiras" placeholder="Qtd" min="0">
+          </div>
+          <div class="form-group">
+            <label>Mesas</label>
+            <input type="number" id="res-mesas" placeholder="Qtd" min="0">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Observacoes (opcional)</label>
+      <textarea id="res-obs" rows="2" placeholder="Informacoes adicionais..." style="resize:none"></textarea>
+    </div>
+
+    <div class="valor-box" id="valor-box" style="display:none">
+      <div>
+        <div style="font-size:13px;color:#666">Valor estimado</div>
+        <div style="font-size:11px;color:#999" id="valor-detalhe"></div>
+      </div>
+      <div class="valor-total" id="valor-total">R$ 0,00</div>
+    </div>
+
+    <button class="btn-confirmar" onclick="confirmarReserva()">✅ Confirmar Reserva</button>
+    <p style="font-size:12px;color:#999;text-align:center;margin-top:8px">O valor sera cobrado na conta do condominio. Cancelamento gratuito ate 48h antes.</p>
+  `;
+
+  // Eventos para calcular valor ao mudar hora
+  document.getElementById('res-inicio').addEventListener('change', calcularValor);
+  document.getElementById('res-fim').addEventListener('change', calcularValor);
+}
+
+function toggleEspaco(id, nome, bloqueado) {
+  if (bloqueado) return;
+
+  const combinaveis = espacosCache.filter(e => e.combinavel).map(e => e.id);
+  const idx = espacosSelecionados.indexOf(id);
+
+  if (idx > -1) {
+    espacosSelecionados.splice(idx, 1);
+  } else {
+    // Verifica adjacencia para combinaveis
+    if (combinaveis.includes(id)) {
+      const selecionadosComb = espacosSelecionados.filter(s => combinaveis.includes(s));
+      if (selecionadosComb.length > 0) {
+        const idxEspaco = combinaveis.indexOf(id);
+        const idxSels = selecionadosComb.map(s => combinaveis.indexOf(s));
+        const min = Math.min(...idxSels);
+        const max = Math.max(...idxSels);
+        if (idxEspaco !== min - 1 && idxEspaco !== max + 1) {
+          alert('Salas combinaveis devem ser adjacentes (ex: Sala 1+2 ou Sala 2+3).');
+          return;
+        }
+      }
+    }
+    espacosSelecionados.push(id);
+  }
+
+  // Atualiza visual
+  espacosCache.forEach(e => {
+    const el = document.getElementById('esp-' + e.id);
+    const check = document.getElementById('check-' + e.id);
+    if (!el) return;
+    if (espacosSelecionados.includes(e.id)) {
+      el.classList.add('selected');
+      check.textContent = '☑';
+    } else {
+      el.classList.remove('selected');
+      check.textContent = '☐';
+    }
+  });
+
+  atualizarMaterial();
+  calcularValor();
+}
+
+async function atualizarMaterial() {
+  const temSalaComMaterial = espacosSelecionados.some(id => {
+    const e = espacosCache.find(e => e.id === id);
+    return e && ['Sala 1','Sala 2','Sala 3'].includes(e.nome);
+  });
+
+  const matSection = document.getElementById('material-section');
+  if (!temSalaComMaterial) { matSection.style.display = 'none'; return; }
+  matSection.style.display = 'block';
+
+  // Calcula limite pelas salas selecionadas
+  let maxCad = 0, maxMes = 0;
+  espacosSelecionados.forEach(id => {
+    const e = espacosCache.find(e => e.id === id);
+    if (!e) return;
+    if (e.nome === 'Sala 1' || e.nome === 'Sala 2') { maxCad += 45; maxMes += 12; }
+    if (e.nome === 'Sala 3') { maxCad += 55; maxMes += 14; }
+  });
+  maxCad = Math.min(maxCad, 115);
+  maxMes = Math.min(maxMes, 33);
+
+  // Material disponivel no horario
+  const inicio = document.getElementById('res-inicio').value + ':00';
+  const fim = document.getElementById('res-fim').value + ':00';
+  const data = document.getElementById('res-data').value;
+  const { data: matRes } = await db.from('material_reservado').select().eq('data', data).lt('hora_inicio', fim).gt('hora_fim', inicio);
+  const cadUsadas = (matRes || []).reduce((s,m) => s + (m.num_cadeiras||0), 0);
+  const mesUsadas = (matRes || []).reduce((s,m) => s + (m.num_mesas||0), 0);
+  const cadDisp = Math.min(maxCad, 115 - cadUsadas);
+  const mesDisp = Math.min(maxMes, 33 - mesUsadas);
+
+  document.getElementById('material-info').textContent = 'Disponivel: ' + cadDisp + ' cadeiras e ' + mesDisp + ' mesas | Limite das salas: ' + maxCad + ' cadeiras e ' + maxMes + ' mesas';
+  document.getElementById('res-cadeiras').max = cadDisp;
+  document.getElementById('res-mesas').max = mesDisp;
+}
+
+function calcularValor() {
+  const inicio = document.getElementById('res-inicio')?.value;
+  const fim = document.getElementById('res-fim')?.value;
+  if (!inicio || !fim || !espacosSelecionados.length) {
+    document.getElementById('valor-box').style.display = 'none'; return;
+  }
+  const [hi, mi] = inicio.split(':').map(Number);
+  const [hf, mf] = fim.split(':').map(Number);
+  const durMin = (hf * 60 + mf) - (hi * 60 + mi);
+  if (durMin <= 0) { document.getElementById('valor-box').style.display = 'none'; return; }
+  const periodos = Math.ceil(durMin / 120);
+
+  const periodoInfo = document.getElementById('periodo-info');
+  periodoInfo.textContent = 'Duracao: ' + Math.floor(durMin/60) + 'h' + (durMin%60>0?durMin%60+'min':'') + ' = ' + periodos + ' periodo(s) de 2h';
+
+  let total = 0;
+  const detalhes = [];
+  espacosSelecionados.forEach(id => {
+    const e = espacosCache.find(e => e.id === id);
+    if (!e) return;
+    const nome = e.nome;
+    if (nome === 'Copa') { total += 50; detalhes.push('Copa: R$ 50 (valor fixo)'); }
+    else if (nome === 'Coffee') { detalhes.push('Coffee: Gratuito'); }
+    else {
+      const v = (valoresPor2h[nome] || 105) * periodos;
+      total += v;
+      detalhes.push(nome + ': R$ ' + v.toFixed(2) + ' (' + periodos + 'x R$' + (valoresPor2h[nome]||105) + ')');
+    }
+  });
+
+  document.getElementById('valor-box').style.display = 'flex';
+  document.getElementById('valor-total').textContent = 'R$ ' + total.toFixed(2);
+  document.getElementById('valor-detalhe').textContent = detalhes.join(' | ');
+}
+
+async function confirmarReserva() {
+  const data = document.getElementById('res-data').value;
+  const inicio = document.getElementById('res-inicio').value + ':00';
+  const fim = document.getElementById('res-fim').value + ':00';
+  const responsavel = document.getElementById('res-responsavel').value.trim();
+  const pessoas = document.getElementById('res-pessoas').value;
+  const obs = document.getElementById('res-obs').value.trim();
+  const erroEl = document.getElementById('erro-reserva');
+  const sucessoEl = document.getElementById('sucesso-reserva');
+  erroEl.style.display = 'none'; sucessoEl.style.display = 'none';
+
+  if (!data || !inicio || !fim || !responsavel) { erroEl.textContent = 'Preencha data, horario e responsavel.'; erroEl.style.display = 'block'; return; }
+  if (espacosSelecionados.length === 0) { erroEl.textContent = 'Selecione pelo menos um espaco.'; erroEl.style.display = 'block'; return; }
+  if (inicio >= fim) { erroEl.textContent = 'Horario de fim deve ser maior que inicio.'; erroEl.style.display = 'block'; return; }
+
+  // Verifica conflito com intervalo de 1h
+  const fimComIntervalo = adicionarHora(fim);
+  const { data: conflitos } = await db.from('reservas').select().eq('data', data).lt('hora_inicio', fimComIntervalo).gt('hora_fim', inicio);
+  const temConflito = (conflitos || []).some(r => (r.espaco_ids || []).some(id => espacosSelecionados.includes(id)));
+  if (temConflito) { erroEl.textContent = 'Horario conflita com reserva existente (incluindo 1h de limpeza).'; erroEl.style.display = 'block'; return; }
+
+  // Calcula valor
+  const [hi, mi] = inicio.split(':').map(Number);
+  const [hf, mf] = fim.split(':').map(Number);
+  const durMin = (hf*60+mf) - (hi*60+mi);
+  const periodos = Math.ceil(durMin / 120);
+  let total = 0;
+  espacosSelecionados.forEach(id => {
+    const e = espacosCache.find(e => e.id === id);
+    if (!e) return;
+    if (e.nome === 'Copa') total += 50;
+    else if (e.nome !== 'Coffee') total += (valoresPor2h[e.nome] || 105) * periodos;
+  });
+
+  const cadeiras = parseInt(document.getElementById('res-cadeiras')?.value || 0) || 0;
+  const mesas = parseInt(document.getElementById('res-mesas')?.value || 0) || 0;
+
+  const { data: reserva, error } = await db.from('reservas').insert({
+    espaco_ids: espacosSelecionados,
+    data, hora_inicio: inicio, hora_fim: fim,
+    responsavel_nome: responsavel,
+    sala_id: salaAtual.id,
+    num_pessoas: parseInt(pessoas) || null,
+    valor_total: total,
+    observacoes: obs || null,
+    num_cadeiras: cadeiras,
+    num_mesas: mesas,
+  }).select('id').single();
+
+  if (error) { erroEl.textContent = 'Erro ao salvar: ' + error.message; erroEl.style.display = 'block'; return; }
+
+  // Registra material
+  if (cadeiras > 0 || mesas > 0) {
+    await db.from('material_reservado').insert({ reserva_id: reserva.id, data, hora_inicio: inicio, hora_fim: fim, num_cadeiras: cadeiras, num_mesas: mesas });
+  }
+
+  espacosSelecionados = [];
+  sucessoEl.textContent = '✅ Reserva confirmada! Valor a ser cobrado: R$ ' + total.toFixed(2);
+  sucessoEl.style.display = 'block';
+  window.scrollTo(0, 0);
+  carregarReservas();
+  await renderizarFormReserva();
+}
+
+function adicionarHora(hora) {
+  const [h, m] = hora.split(':').map(Number);
+  const novoH = Math.min(h + 1, 23);
+  return novoH.toString().padStart(2,'0') + ':' + m.toString().padStart(2,'0') + ':00';
+}
+
+function abrirFoto(url) { document.getElementById('modal-img').src=url; document.getElementById('modal-foto').classList.add('open'); }
+function fecharFoto() { document.getElementById('modal-foto').classList.remove('open'); }
+
+// Verifica sessao salva
+const salaSalva = localStorage.getItem('ar3000_sala');
+if (salaSalva) {
+  salaAtual = JSON.parse(salaSalva);
+  mostrarDashboard();
+}
+
+document.getElementById('sala-senha').addEventListener('keydown', e => { if (e.key === 'Enter') loginSala(); });
+</script>
+</body>
+</html>
