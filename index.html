@@ -929,6 +929,20 @@ async function salvarEdicaoPortaria() {
     convidados: coletarConvidadosEditP(),
   }).eq('id', reservaEditPortaria.id);
 
+  await db.from('material_reservado').delete().eq('reserva_id', reservaEditPortaria.id);
+  const cadEdit = parseInt(document.getElementById('edit-p-cad')?.value||0)||0;
+  const mesEdit = parseInt(document.getElementById('edit-p-mes')?.value||0)||0;
+  if (cadEdit > 0 || mesEdit > 0) {
+    await db.from('material_reservado').insert({
+      reserva_id: reservaEditPortaria.id,
+      data: reservaEditPortaria.data,
+      hora_inicio: inicio,
+      hora_fim: fim,
+      num_cadeiras: cadEdit,
+      num_mesas: mesEdit,
+    });
+  }
+
   fecharModalEditPortaria();
   carregarReservas();
 }

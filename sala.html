@@ -211,7 +211,8 @@ async function loginSala() {
   }
 
   salaAtual = sala;
-  localStorage.setItem('ar3000_sala', JSON.stringify(sala));
+  const { senha: _, ...salaSegura } = sala;
+  localStorage.setItem('ar3000_sala', JSON.stringify(salaSegura));
   mostrarDashboard();
 }
 
@@ -715,97 +716,6 @@ async function enviarEmailReserva(dados) {
   } catch(e) { console.error('Erro ao enviar email:', e); }
 }
 
-async function carregarConfiguracoes() {
-  document.getElementById('cfg-loading').style.display = 'block';
-  document.getElementById('cfg-form').style.display = 'none';
-  const { data } = await db.from('configuracoes').select('chave, valor');
-  const cad = (data||[]).find(c=>c.chave==='max_cadeiras')?.valor || 115;
-  const mes = (data||[]).find(c=>c.chave==='max_mesas')?.valor || 33;
-  document.getElementById('cfg-cadeiras').value = cad;
-  document.getElementById('cfg-mesas').value = mes;
-  document.getElementById('cfg-loading').style.display = 'none';
-  document.getElementById('cfg-form').style.display = 'block';
-}
-async function salvarConfiguracoes() {
-  const cad = parseInt(document.getElementById('cfg-cadeiras').value);
-  const mes = parseInt(document.getElementById('cfg-mesas').value);
-  const msg = document.getElementById('cfg-msg');
-  if (!cad || !mes) { msg.textContent = 'Valores invalidos.'; msg.style.color='#e53935'; return; }
-  await db.from('configuracoes').update({ valor: cad }).eq('chave', 'max_cadeiras');
-  await db.from('configuracoes').update({ valor: mes }).eq('chave', 'max_mesas');
-  msg.textContent = '✅ Salvo! ' + cad + ' cadeiras e ' + mes + ' mesas.'; msg.style.color='#2e7d32';
-}
-let convPCount = 0;
-function adicionarConvidadoP() {
-  convPCount++;
-  const id = convPCount;
-  const div = document.createElement('div');
-  div.id = 'convp-' + id;
-  div.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
-  div.innerHTML = '<input type="text" placeholder="Nome completo" style="padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px" id="convp-nome-' + id + '">' +
-    '<input type="text" placeholder="RG/CPF" style="padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px" id="convp-doc-' + id + '">' +
-    '<button onclick="document.getElementById(\'convp-\'+' + id + ').remove()" style="padding:8px 12px;background:none;color:#e53935;border:1px solid #e53935;border-radius:8px;cursor:pointer">✕</button>';
-  document.getElementById('conv-p-lista').appendChild(div);
-}
-function coletarConvidadosP() {
-  const lista = [];
-  document.querySelectorAll('[id^="convp-nome-"]').forEach(input => {
-    const id = input.id.replace('convp-nome-', '');
-    const nome = input.value.trim();
-    const doc = document.getElementById('convp-doc-' + id)?.value?.trim() || '';
-    if (nome) lista.push({ nome, documento: doc });
-  });
-  return lista;
-}
-let convCount = 0;
-function adicionarConvidado() {
-  convCount++;
-  const id = convCount;
-  const div = document.createElement('div');
-  div.id = 'conv-' + id;
-  div.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
-  div.innerHTML = '<input type="text" placeholder="Nome completo" style="padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px" id="conv-nome-' + id + '">' +
-    '<input type="text" placeholder="RG/CPF" style="padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px" id="conv-doc-' + id + '">' +
-    '<button onclick="document.getElementById(\'conv-\'+' + id + ').remove()" style="padding:8px 12px;background:none;color:#e53935;border:1px solid #e53935;border-radius:8px;cursor:pointer">✕</button>';
-  document.getElementById('convidados-lista').appendChild(div);
-}
-function coletarConvidados() {
-  const lista = [];
-  document.querySelectorAll('[id^="conv-nome-"]').forEach(input => {
-    const id = input.id.replace('conv-nome-', '');
-    const nome = input.value.trim();
-    const doc = document.getElementById('conv-doc-' + id)?.value?.trim() || '';
-    if (nome) lista.push({ nome, documento: doc });
-  });
-  return lista;
-}
-async function gerarPDFConvidados(reserva) {
-  const { jsPDF } = window.jspdf;
-  const convidados = reserva.convidados || [];
-  const dataFmt = new Date(reserva.data+'T12:00:00').toLocaleDateString('pt-BR', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  const nomesEsp = (reserva.espaco_ids||[]).map(id => { const e = espacosCache.find(e=>e.id===id); return e?e.nome:id; }).join(' + ');
-  const doc = await criarPDF('Lista de Convidados - ' + nomesEsp, 'Data: ' + dataFmt + ' | ' + reserva.hora_inicio.substring(0,5) + ' - ' + reserva.hora_fim.substring(0,5) + ' | Resp: ' + reserva.responsavel_nome);
-  if (!convidados.length) {
-    doc.setFontSize(12); doc.setTextColor(150,150,150);
-    doc.text('Nenhum convidado registrado.', 14, 56);
-  } else {
-    doc.autoTable({
-      startY: 52,
-      head: [['#', 'Nome Completo', 'Documento (RG/CPF)']],
-      body: convidados.map((c,i) => [i+1, c.nome, c.documento||'-']),
-      headStyles: { fillColor: [26,35,126], textColor: 255, fontStyle: 'bold', fontSize: 11 },
-      bodyStyles: { fontSize: 10 },
-      alternateRowStyles: { fillColor: [248,249,255] },
-      columnStyles: { 0:{cellWidth:14}, 1:{cellWidth:100}, 2:{cellWidth:70} },
-      margin: { left: 14, right: 14 },
-    });
-    const y = doc.lastAutoTable.finalY + 12;
-    doc.setFontSize(10); doc.setTextColor(150,150,150);
-    doc.text('Total: ' + convidados.length + ' convidados', 14, y);
-  }
-  doc.save('convidados-' + reserva.data + '.pdf');
-}
-
 let reservaEditando = null;
 let espacosEditSala = [];
 
@@ -921,6 +831,8 @@ async function salvarEdicaoSala() {
     convidados: coletarConvidadosEdit(),
   }).eq('id', reservaEditando.id);
 
+  await db.from('material_reservado').delete().eq('reserva_id', reservaEditando.id);
+
   fecharModalEditSala();
   carregarReservas();
 }
@@ -991,6 +903,7 @@ async function abrirDetalhesReserva(reservaId) {
 async function cancelarReservaDetalhes(id) {
   if (!confirm('Cancelar esta reserva?')) return;
   await db.from('reservas').delete().eq('id', id);
+  await db.from('material_reservado').delete().eq('reserva_id', id);
   fecharDetalhesReserva();
   carregarReservas();
 }
