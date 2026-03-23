@@ -631,7 +631,7 @@ async function renderizarFormPortaria() {
   });
 }
 
-function toggleEspacoP(id) {
+async function toggleEspacoP(id) {
   const idx = espacosSelPortaria.indexOf(id);
   if (idx > -1) espacosSelPortaria.splice(idx, 1); else espacosSelPortaria.push(id);
   espacosPortaria.forEach(e => {
@@ -641,7 +641,7 @@ function toggleEspacoP(id) {
     if (espacosSelPortaria.includes(e.id)) { el.classList.add('selected'); chk.textContent = '☑'; }
     else { el.classList.remove('selected'); chk.textContent = '☐'; }
   });
-  atualizarMaterialPortaria(); calcValorPortaria();
+  await atualizarMaterialPortaria(); calcValorPortaria();
 }
 
 async function atualizarMaterialPortaria() {
