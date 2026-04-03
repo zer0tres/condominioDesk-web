@@ -204,47 +204,51 @@ function toggleSenha() {
 
 async function loginSala() {
   const btn = document.querySelector('.btn-primary');
-  btn.disabled = true;
-  btn.textContent = 'Entrando...';
-  const numero = document.getElementById('sala-numero').value.trim();
-  const senha = document.getElementById('sala-senha').value.trim();
   const erroEl = document.getElementById('erro-login');
   erroEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
 
-  if (!numero || !senha) { erroEl.textContent = 'Preencha todos os campos.';
-  btn.disabled = false;
-  btn.textContent = 'Entrar';
-  btn.disabled = false;
-  btn.textContent = 'Entrar';
-  return; }
+  try {
+    const numero = document.getElementById('sala-numero').value.trim();
+    const senha = document.getElementById('sala-senha').value.trim();
 
-  const n = parseInt(numero);
-  const valido = numero === '000' || (n >= 401 && n <= 2510 && (n % 100) >= 1 && (n % 100) <= 10);
-  if (!valido) { erroEl.textContent = 'Numero de sala invalido.';
-  btn.disabled = false;
-  btn.textContent = 'Entrar';
-  return; }
+    if (!numero || !senha) {
+      erroEl.textContent = 'Preencha todos os campos.';
+      return;
+    }
 
-  const { data: sala } = await db.from('salas').select().eq('numero', numero).eq('senha', senha).maybeSingle();
-  if (!sala) { erroEl.textContent = 'Numero ou senha incorretos.';
-  btn.disabled = false;
-  btn.textContent = 'Entrar';
-  return; }
+    const n = parseInt(numero);
+    const valido = numero === '000' || (n >= 401 && n <= 2510 && (n % 100) >= 1 && (n % 100) <= 10);
+    if (!valido) {
+      erroEl.textContent = 'Numero de sala invalido.';
+      return;
+    }
 
-  // Primeiro acesso
-  if (sala.senha === 'sala' + numero) {
-  _salaTemp = sala;
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('modal-primeiro-acesso').style.display = 'flex';
-  btn.disabled = false;
-  btn.textContent = 'Entrar';
-  return;
-}
+    const { data: sala } = await db.from('salas').select().eq('numero', numero).eq('senha', senha).maybeSingle();
+    if (!sala) {
+      erroEl.textContent = 'Numero ou senha incorretos.';
+      return;
+    }
 
-  salaAtual = sala;
-  const { senha: _, ...salaSegura } = sala;
-  localStorage.setItem('ar3000_sala', JSON.stringify(salaSegura));
-  mostrarDashboard();
+    if (sala.senha === 'sala' + numero) {
+      _salaTemp = sala;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('modal-primeiro-acesso').style.display = 'flex';
+      return;
+    }
+
+    salaAtual = sala;
+    const { senha: _, ...salaSegura } = sala;
+    localStorage.setItem('ar3000_sala', JSON.stringify(salaSegura));
+    mostrarDashboard();
+
+  } catch (e) {
+    erroEl.textContent = 'Erro de conexao. Verifique sua internet e tente novamente.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+  }
 }
 
 function logoutSala() {
@@ -467,6 +471,8 @@ async function renderizarFormReserva() {
   // Eventos para calcular valor ao mudar hora
   document.getElementById('res-inicio').addEventListener('change', calcularValor);
   document.getElementById('res-fim').addEventListener('change', calcularValor);
+  // Atualiza disponibilidade de Copa/Coffee ao mudar a data
+  document.getElementById('res-data').addEventListener('change', () => renderizarFormReserva());
 }
 
 function toggleEspaco(id, nome, bloqueado) {
