@@ -174,11 +174,28 @@ const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let salaAtual = null;
+let _salaTemp = null;
 let espacosCache = [];
 let espacosSelecionados = [];
 let filtroAtual = 'pendente';
 
 const valoresPor2h = { 'Sala 1': 105, 'Sala 2': 105, 'Sala 3': 150, 'Sala de Reunioes': 105, 'Copa': 50, 'Coffee': 0 };
+
+async function confirmarPrimeiroAcesso() {
+  const nova = document.getElementById('pa-nova').value.trim();
+  const confirma = document.getElementById('pa-confirma').value.trim();
+  const err = document.getElementById('pa-erro');
+  err.textContent = '';
+  if (nova.length < 4) { err.textContent = 'Minimo 4 caracteres.'; return; }
+  if (nova !== confirma) { err.textContent = 'As senhas nao coincidem.'; return; }
+  await db.from('salas').update({ senha: nova }).eq('id', _salaTemp.id);
+  _salaTemp.senha = nova;
+  document.getElementById('modal-primeiro-acesso').style.display = 'none';
+  salaAtual = _salaTemp;
+  const { senha: _, ...salaSegura } = salaAtual;
+  localStorage.setItem('ar3000_sala', JSON.stringify(salaSegura));
+  mostrarDashboard();
+}
 
 function toggleSenha() {
   const input = document.getElementById('sala-senha');
@@ -186,29 +203,43 @@ function toggleSenha() {
 }
 
 async function loginSala() {
+  const btn = document.querySelector('.btn-primary');
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
   const numero = document.getElementById('sala-numero').value.trim();
   const senha = document.getElementById('sala-senha').value.trim();
   const erroEl = document.getElementById('erro-login');
   erroEl.textContent = '';
 
-  if (!numero || !senha) { erroEl.textContent = 'Preencha todos os campos.'; return; }
+  if (!numero || !senha) { erroEl.textContent = 'Preencha todos os campos.';
+  btn.disabled = false;
+  btn.textContent = 'Entrar';
+  btn.disabled = false;
+  btn.textContent = 'Entrar';
+  return; }
 
   const n = parseInt(numero);
   const valido = numero === '000' || (n >= 401 && n <= 2510 && (n % 100) >= 1 && (n % 100) <= 10);
-  if (!valido) { erroEl.textContent = 'Numero de sala invalido.'; return; }
+  if (!valido) { erroEl.textContent = 'Numero de sala invalido.';
+  btn.disabled = false;
+  btn.textContent = 'Entrar';
+  return; }
 
   const { data: sala } = await db.from('salas').select().eq('numero', numero).eq('senha', senha).maybeSingle();
-  if (!sala) { erroEl.textContent = 'Numero ou senha incorretos.'; return; }
+  if (!sala) { erroEl.textContent = 'Numero ou senha incorretos.';
+  btn.disabled = false;
+  btn.textContent = 'Entrar';
+  return; }
 
   // Primeiro acesso
   if (sala.senha === 'sala' + numero) {
-    const nova = prompt('Primeiro acesso! Crie sua nova senha (minimo 4 caracteres):');
-    if (!nova || nova.length < 4) { erroEl.textContent = 'Senha invalida.'; return; }
-    const confirma = prompt('Confirme sua nova senha:');
-    if (nova !== confirma) { erroEl.textContent = 'As senhas nao coincidem.'; return; }
-    await db.from('salas').update({ senha: nova }).eq('id', sala.id);
-    sala.senha = nova;
-  }
+  _salaTemp = sala;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('modal-primeiro-acesso').style.display = 'flex';
+  btn.disabled = false;
+  btn.textContent = 'Entrar';
+  return;
+}
 
   salaAtual = sala;
   const { senha: _, ...salaSegura } = sala;
@@ -332,8 +363,8 @@ async function renderizarFormReserva() {
   if (!salaAtual) return;
 
   // Verifica Copa/Coffee ocupados hoje por outra sala
-  const hoje = new Date().toISOString().split('T')[0];
-  const { data: reservasHoje } = await db.from('reservas').select('espaco_ids, sala_id').eq('data', hoje);
+  const dataInput = document.getElementById('res-data')?.value || new Date().toISOString().split('T')[0];
+  const { data: reservasHoje } = await db.from('reservas').select('espaco_ids, sala_id').eq('data', dataInput);
   const copaOcupada = (reservasHoje || []).some(r => r.sala_id !== salaAtual.id && (r.espaco_ids || []).some(id => espacosCache.find(e => e.id === id && e.nome === 'Copa')));
   const coffeeOcupado = (reservasHoje || []).some(r => r.sala_id !== salaAtual.id && (r.espaco_ids || []).some(id => espacosCache.find(e => e.id === id && e.nome === 'Coffee')));
 
@@ -971,6 +1002,16 @@ document.getElementById('sala-senha').addEventListener('keydown', e => { if (e.k
     </div>
     <button class="btn-confirmar" onclick="salvarEdicaoSala()">💾 Salvar Alteracoes</button>
     <button class="btn-cancelar" onclick="fecharModalEditSala()">Cancelar</button>
+  </div>
+</div>
+<div id="modal-primeiro-acesso" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:white;border-radius:16px;padding:32px;width:100%;max-width:380px">
+    <h2 style="color:#00695c;font-size:20px;margin-bottom:8px">Primeiro acesso</h2>
+    <p style="color:#666;font-size:14px;margin-bottom:24px">Crie sua senha pessoal para acessar suas encomendas.</p>
+    <input type="password" id="pa-nova" placeholder="Nova senha (min. 4 caracteres)" style="width:100%;padding:12px 16px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:15px;margin-bottom:12px;box-sizing:border-box;outline:none">
+    <input type="password" id="pa-confirma" placeholder="Confirmar senha" style="width:100%;padding:12px 16px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:15px;margin-bottom:12px;box-sizing:border-box;outline:none">
+    <p id="pa-erro" style="color:#e53935;font-size:13px;min-height:18px;margin-bottom:12px"></p>
+    <button onclick="confirmarPrimeiroAcesso()" style="width:100%;padding:14px;background:#00695c;color:white;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer">Salvar senha</button>
   </div>
 </div>
 </body>
